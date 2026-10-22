@@ -4,148 +4,108 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1b1d22">
-<meta name="description" content="MARKET / LAB — профессиональный учебный терминал фьючерсов: график, DOM, сделки и лаборатория.">
-<title>MARKET / LAB | Futures Trading Workspace</title>
+<meta name="description" content="MARKET / LAB — учебный симулятор фьючерсов: сделки, риски, экономика и практика.">
+<title>MARKET / LAB — Лаборатория рынка</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app-shell">
-  <header class="global-header">
-    <a class="brand" id="brandLink" href="#terminal" aria-label="MARKET / LAB"><svg viewBox="0 0 48 44" width="40" height="37" aria-hidden="true"><path d="M5 33 17 11 28 24 43 4" fill="none" stroke="#d8ae43" stroke-width="3"/><path d="M4 17 15 30 26 9 38 20" fill="none" stroke="#bbc6d6" stroke-width="3"/></svg></a>
-    <button class="account-select" id="accountSelector" title="Учебный счёт">$50K SIM <span class="account-sep">|</span> TEST_123 <span>▾</span></button>
-    <div class="account-metrics" aria-label="Сводка счёта">
-      <div class="top-metric"><span>BAL:</span> <b id="equity">$50,000.00</b></div>
-      <div class="top-metric"><span>MLL:</span> <b id="freeMargin">$50,000.00</b></div>
-      <div class="top-metric pnl-top"><span>RP&amp;L:</span> <b id="totalPnl">+$0.00</b></div>
-      <div class="top-metric"><span>UP&amp;L:</span> <b id="unrealizedPnl">$0.00</b></div>
-      <div class="top-metric"><span>MARGIN:</span> <b id="usedMargin">$0.00</b></div>
-      <div class="top-metric progress-metric"><span>RISK:</span> <b id="riskPct">0.0%</b><span class="risk-track"><i id="riskBar"></i></span></div>
-    </div>
-    <div class="header-spacer"></div>
-    <span class="connection-label">Refresh: Simulated <span class="signal">◉ ▮▮▮</span></span>
-    <button class="header-select" id="layoutButton">LAYOUT | default (draft) <span>▾</span></button>
-    <button class="tiny-icon" id="settingsButton" title="Настройки">⚙</button>
-    <button class="tiny-icon" id="fullScreenButton" title="На весь экран">⛶</button>
-  </header>
-
-  <nav class="rail" aria-label="Навигация">
-    <button data-view="terminal" class="rail-button active" title="Терминал" aria-label="Терминал">▥</button>
-    <button data-view="laboratory" class="rail-button" title="Лаборатория" aria-label="Лаборатория">⌁</button>
-    <button data-view="journal" class="rail-button" title="Журнал" aria-label="Журнал">☷</button>
-    <div class="rail-separator"></div>
-    <button class="rail-button" id="assetPickerRail" title="Инструменты" aria-label="Инструменты">⌕</button>
-    <button class="rail-button" id="macroRail" title="Макросценарии" aria-label="Макросценарии">⚡</button>
-    <button class="rail-button" id="infoRail" title="О модели" aria-label="О модели">ⓘ</button>
-    <span class="rail-bottom">ML<br>1.2</span>
-  </nav>
-
-  <main class="workspace-main">
-    <section class="view active" id="terminal" aria-label="Торговый терминал">
-      <div class="terminal-grid">
-        <section class="pane chart-pane">
-          <div class="pane-tabs"><button class="pane-tab active">Chart <span>×</span></button><span class="pane-fill"></span><button class="pane-add" id="chartNew" title="Выбрать инструмент">＋</button><button class="pane-square" title="График">□</button></div>
-          <div class="chart-toolbar">
-            <button class="symbol-search" id="symbolPicker"><span>⌕</span> <b id="symbolTicker">/MNQ</b></button>
-            <div class="toolbar-divider"></div>
-            <button class="tool-icon" title="Избранное" id="favoriteButton">☆</button>
-            <div class="toolbar-divider"></div>
-            <div class="timeframes" id="timeframes"><button class="active" data-frame="15">15m</button><button data-frame="60">1h</button><button data-frame="240">4h</button><button data-frame="1440">1D</button></div>
-            <div class="toolbar-divider"></div>
-            <button id="chartMode" class="chart-mode-tool">▥ <span>Свечи</span></button>
-            <button id="indicatorToggle" class="chart-mode-tool"><span class="formula">ƒx</span> Indicators</button>
-            <button id="drawingToggle" class="tool-icon" title="Инструменты рисования">⌁</button>
-            <button class="chart-mode-tool hide-narrow" id="preferencesButton">⚙ Preferences</button>
-            <span class="toolbar-flex"></span>
-            <button class="tool-icon" id="chartScreenshot" title="Сохранить график как PNG">▣</button>
-            <button class="tool-icon" id="chartExpand" title="Увеличить график">⛶</button>
-          </div>
-          <div class="quote-strip"><strong id="chartFullSymbol">MNQZ25 · 15</strong><span class="status-dot">●</span><span id="ohlc">O — H — L — C —</span><span id="priceChange">+0.00%</span></div>
-          <div class="chart-stage">
-            <div class="drawing-rail"><button title="Крестик">＋</button><button title="Линия">╱</button><button title="Горизонтальный уровень">☰</button><button title="Сетка">⋈</button><button title="Кривая">〰</button><button title="Текст">T</button><span></span><button title="Измерение">♧</button><button title="Магнит">∩</button><button title="Видимость">◉</button><button title="Удалить">♲</button></div>
-            <div class="chart-canvas-wrap">
-              <div class="chart-watermark" aria-hidden="true"><strong id="watermarkTicker">/MNQ</strong><span id="watermarkContract">MNQZ25</span></div>
-              <canvas id="priceChart" role="img" aria-label="Синтетический свечной график фьючерсов"></canvas>
-              <div class="chart-crosshair" id="chartTooltip" hidden></div>
-              <div class="chart-last-overlay" id="lastPrice">24,834.25</div>
-              <div class="chart-floating-tools" id="autoIndicator">SIM / OFFLINE</div>
-            </div>
-          </div>
-          <div class="chart-footer"><div class="range-tabs" id="rangeTabs"><button data-range="32">1h</button><button data-range="64">3h</button><button data-range="128" class="active">1d</button><button data-range="256">5d</button></div><span class="chart-spacer"></span><button class="control-subtle" id="tickOne">+ 1 BAR</button><button class="control-subtle" id="tickTen">+ 10</button><button class="control-subtle" id="autoPlay">▶ AUTO</button><span class="chart-clock" id="timeNow">SIM / UTC</span></div>
-          <div class="asset-popup" id="assetPopup" hidden>
-            <div class="asset-popup-title">SYMBOL SEARCH <button id="assetPopupClose" title="Закрыть">×</button></div>
-            <input id="marketSearch" type="search" placeholder="Symbol / instrument..." autocomplete="off" aria-label="Поиск фьючерса">
-            <div class="filters" id="filters"><button class="active" data-filter="all">All</button><button data-filter="index">Index</button><button data-filter="energy">Energy</button><button data-filter="metal">Metals</button></div>
-            <div class="market-list" id="marketList"></div>
-          </div>
-          <div class="quick-symbols" id="quickSymbols" hidden></div><span id="assetIcon" hidden></span><span id="assetCode" hidden></span><span id="assetLong" hidden></span>
-        </section>
-
-        <section class="order-stack">
-          <div class="pane order-pane">
-            <div class="pane-tabs"><button class="pane-tab active"><span class="tab-ball">◉</span> Order <span>×</span></button><span class="pane-fill"></span><button class="pane-add" title="Приказы">＋</button><button class="pane-square">□</button></div>
-            <div class="order-content">
-              <label class="form-label" for="orderAsset">Contract</label>
-              <button id="assetSelector" class="native-field asset-native"><span id="ticketAssetIcon">▣</span><b id="ticketCode">MNQ</b><small id="ticketLabel">Micro Nasdaq 100</small><span class="field-caret">▼</span></button>
-              <label class="form-label" for="orderType">Order Type</label>
-              <select id="orderType" class="native-field"><option value="market">Market</option><option value="limit">Limit</option></select>
-              <label class="form-label" for="quantity"># of Contracts</label>
-              <div class="qty-line"><button id="qtyDown">−</button><output id="quantity">1</output><button id="qtyUp">+</button></div>
-              <div class="spread-info"><span>BID <b id="bestBid">—</b></span><strong id="spreadMid">—</strong><span>ASK <b id="bestAsk">—</b></span></div>
-              <label class="form-label" id="limitLabel" for="limitPrice" hidden>Limit Price</label>
-              <input class="native-field" type="number" id="limitPrice" step="0.25" hidden>
-              <button class="native-field acc-field" id="accountDropdown">$50K SIM | TEST_123 <span>▾</span></button>
-              <div class="order-position-label" id="activeOrderPosition">No Active Position</div>
-              <div class="quick-qty"><span>OCO Bracket</span><button data-qty="1" class="active">1</button><button data-qty="3">3</button><button data-qty="5">5</button><button data-qty="10">10</button><button id="bracketInfo" title="OCO — одно отменяет другое">?</button></div>
-              <div class="bracket-row"><span>Template</span><button id="bracketSelector">Manual · Sim <span>▾</span></button></div>
-              <div class="two-actions"><button class="buy-btn" id="longButton">BUY</button><button class="sell-btn" id="shortButton">SELL</button></div>
-              <div class="two-actions main-actions"><button class="buy-btn" id="placeOrder">BUY +1 @ MARKET</button><button class="sell-btn" id="sellOrder">SELL -1 @ MARKET</button></div>
-              <div class="two-actions minor-actions"><button id="joinBid">JOIN BID</button><button id="joinAsk">JOIN ASK</button></div>
-              <div class="three-actions minor-actions"><button id="closeSelected">CLOSE POSITION</button><button id="reversePosition">REVERSE</button><button id="cancelOrders">CANCEL ORDERS</button></div>
-              <div class="two-actions minor-actions"><button id="flattenAll">FLATTEN ALL</button><button id="cancelAll">CANCEL ALL</button></div>
-              <div class="order-bottom-facts"><div>Contract <b id="multiplier">—</b></div><div>Notional <b id="notional">—</b></div><div>Initial margin <b id="initialMargin">—</b></div><div>Fees <b id="fee">—</b></div><div>Free after <b id="afterMargin">—</b></div><span id="openPositionsMeta" hidden></span></div>
-            </div>
-          </div>
-          <div class="pane timesales-pane"><div class="pane-tabs"><button class="pane-tab active"><span class="tab-ball">◉</span> Time and Sales <span>×</span></button><span class="pane-fill"></span><button class="pane-add">＋</button><button class="pane-square">□</button></div><div class="timesales-head"><span>Contract</span><span>Size Filt. 1+</span></div><div class="timesales-contract"><b id="salesCode">MNQZ25</b><span>▾</span></div><table class="sales-table"><thead><tr><th>Trade Time</th><th>Price</th><th>Size</th></tr></thead><tbody id="salesRows"></tbody></table></div>
-        </section>
-
-        <section class="pane dom-pane">
-          <div class="pane-tabs"><button class="pane-tab active"><span class="tab-ball">◉</span> DOM <span>×</span></button><span class="pane-fill"></span><button class="pane-add">＋</button><button class="pane-square">□</button></div>
-          <div class="dom-contract-bar"><span>Contract</span><button id="domAssetSelector"><b id="domCode">MNQZ25</b><span>▾</span></button></div>
-          <div class="dom-table-header"><span>MY BID</span><span>BID SIZE</span><span>PRICE</span><span>ASK SIZE</span><span>VOL PRO.</span></div>
-          <div class="dom-scroller" id="domScroll"><div class="dom-ladder" id="domLadder"></div></div>
-          <div class="dom-footer"><div class="dom-acc">$50K SIM | TEST_123 <span>▾</span></div><div class="order-position-label" id="domActivePosition">No Active Position</div><div class="two-actions"><button class="buy-btn" id="domBuy">BUY +1 MARKET</button><button class="sell-btn" id="domSell">SELL -1 MARKET</button></div><div class="two-actions minor-actions"><button id="domJoinBid">JOIN BID</button><button id="domJoinAsk">JOIN ASK</button></div><div class="two-actions minor-actions"><button id="domFlatten">FLATTEN ALL</button><button id="domCancel">CANCEL ALL</button></div></div>
-        </section>
-
-        <section class="pane blotter-pane">
-          <div class="blotter-tabs" id="blotterTabs"><button data-pane="accounts">Accounts</button><button data-pane="positions">Positions</button><button data-pane="orders">Orders</button><button data-pane="trades" class="active">Trades</button><button data-pane="events">Events</button><button data-pane="notes">Notes</button><span class="pane-fill"></span><button id="addNoteButton" title="Новая заметка">＋</button></div>
-          <div class="blotter-body">
-            <div class="blotter-view" data-blotter="accounts"><div id="accountData"></div></div>
-            <div class="blotter-view" data-blotter="positions"><div class="position-table-wrap"><table class="position-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Last</th><th>UP&amp;L</th><th>Action</th></tr></thead><tbody id="positions"></tbody></table></div></div>
-            <div class="blotter-view" data-blotter="orders"><table class="orders-table"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Limit</th><th>Status</th><th>Action</th></tr></thead><tbody id="pendingOrdersRows"></tbody></table></div>
-            <div class="blotter-view active" data-blotter="trades"><table class="trades-table"><thead><tr><th>Journal</th><th>ID</th><th>Symbol</th><th>Size</th><th>Entry Time</th><th>Direction</th><th>Entry Price</th><th>Exit Price</th><th>P&amp;L</th><th>Fees</th></tr></thead><tbody id="tradesRows"></tbody></table></div>
-            <div class="blotter-view" data-blotter="events"><div class="mini-tabs" id="miniJournalFilters"><button class="active" data-kind="ALL">ALL</button><button data-kind="TRADE">Trades</button><button data-kind="EVENT">Events</button><button data-kind="NOTE">Notes</button></div><div id="miniLog"></div></div>
-            <div class="blotter-view" data-blotter="notes"><div class="events-panel"><span>MACRO / STRESS TEST</span><div id="events"></div></div></div>
-          </div>
-          <div class="blotter-footer"><span>SIM 1.2.0 / MARKET DATA: SYNTHETIC</span><span id="positionCount">0 active</span></div>
-        </section>
+ <header class="global-header">
+  <a class="brand" id="brandLink" href="#terminal" aria-label="Лаборатория рынка"><svg viewBox="0 0 48 44" width="40" height="37" aria-hidden="true"><path d="M5 33 17 11 28 24 43 4" fill="none" stroke="#d8ae43" stroke-width="3"/><path d="M4 17 15 30 26 9 38 20" fill="none" stroke="#bbc6d6" stroke-width="3"/></svg></a>
+  <span class="account-select static-account">УЧЕБНЫЙ СЧЁТ <span>50 000 $</span></span>
+  <div class="account-metrics" aria-label="Сводка счёта">
+   <div class="top-metric"><span>КАПИТАЛ:</span> <b id="equity">—</b></div>
+   <div class="top-metric"><span>СВОБОДНО:</span> <b id="freeMargin">—</b></div>
+   <div class="top-metric pnl-top"><span>РЕЗУЛЬТАТ:</span> <b id="totalPnl">—</b></div>
+   <div class="top-metric"><span>ПО ПОЗИЦИЯМ:</span> <b id="unrealizedPnl">—</b></div>
+   <div class="top-metric"><span>ОБЕСПЕЧЕНИЕ:</span> <b id="usedMargin">—</b></div>
+   <div class="top-metric progress-metric"><span>ДОЛЯ:</span> <b id="riskPct">—</b><span class="risk-track"><i id="riskBar"></i></span></div>
+  </div>
+  <div class="header-spacer"></div>
+  <span class="connection-label">СИМУЛЯЦИЯ <span class="signal">●</span></span>
+  <button class="header-select lesson-shortcut" id="headerLearn">КАК ЭТО РАБОТАЕТ <span>›</span></button>
+ </header>
+ <nav class="rail" aria-label="Разделы">
+  <button data-view="terminal" class="rail-button active" title="Торговля" aria-label="Торговля">▥</button>
+  <button data-view="laboratory" class="rail-button" title="Обучение" aria-label="Обучение">⌁</button>
+  <button data-view="journal" class="rail-button" title="История" aria-label="История">☷</button>
+  <div class="rail-separator"></div>
+  <button class="rail-button" id="assetPickerRail" title="Выбрать инструмент" aria-label="Выбрать инструмент">⌕</button>
+  <button class="rail-button" id="macroRail" title="Экономические события" aria-label="Экономические события">⚡</button>
+  <span class="rail-bottom">ML<br>2.1</span>
+ </nav>
+ <main class="workspace-main">
+  <section class="view active" id="terminal" aria-label="Торговля">
+   <div class="terminal-grid">
+    <section class="pane chart-pane">
+     <div class="pane-tabs"><span class="pane-tab active">График цены</span><span class="pane-fill"></span><span class="pane-meta">УЧЕБНЫЕ КОТИРОВКИ</span></div>
+     <div class="chart-toolbar">
+      <button class="symbol-search" id="symbolPicker"><span>⌕</span> <b id="symbolTicker">MNQ</b><small>▾</small></button>
+      <div class="toolbar-divider"></div>
+      <div class="timeframes" id="timeframes"><button class="active" data-frame="15">15 мин</button><button data-frame="60">1 ч</button><button data-frame="240">4 ч</button></div>
+      <div class="toolbar-divider"></div>
+      <span class="plain-toolbar-text">Свечи</span>
+      <span class="toolbar-flex"></span>
+      <button class="chart-mode-tool" id="helpChart" title="Что показывает график">? Как читать график</button>
+     </div>
+     <div class="quote-strip"><strong id="chartFullSymbol">MNQ · 15 мин</strong><span class="status-dot">●</span><span id="ohlc">—</span><span id="priceChange">—</span></div>
+     <div class="chart-stage">
+      <div class="drawing-rail learning-rail" aria-label="Подсказки к графику"><button data-lesson="0" title="Что такое фьючерс">①</button><button data-lesson="1" title="Что такое длинная и короткая позиция">②</button><button data-lesson="2" title="Как считается результат">③</button><button data-lesson="3" title="Что такое маржа">④</button><span></span><button data-lesson="4" title="Влияние экономических событий">⑤</button></div>
+      <div class="chart-canvas-wrap"><div class="chart-watermark" aria-hidden="true"><strong id="watermarkTicker">MNQ</strong><span id="watermarkContract">ФЬЮЧЕРС</span></div><canvas id="priceChart" role="img" aria-label="Учебный свечной график"></canvas><div class="chart-crosshair" id="chartTooltip" hidden></div><div class="chart-last-overlay" id="lastPrice" hidden></div><div class="chart-floating-tools" id="autoIndicator">УЧЕБНЫЙ РЫНОК</div></div>
+     </div>
+     <div class="chart-footer"><div class="range-tabs" id="rangeTabs"><button data-range="32">32 свечи</button><button data-range="64" class="active">64 свечи</button><button data-range="128">Все</button></div><span class="chart-spacer"></span><button class="control-subtle" id="tickOne">+ 1 СВЕЧА</button><button class="control-subtle" id="tickTen">+ 10</button><button class="control-subtle" id="autoPlay">▶ АВТО</button><span class="chart-clock" id="timeNow">—</span></div>
+     <div class="asset-popup" id="assetPopup" hidden><div class="asset-popup-title">ВЫБОР ФЬЮЧЕРСА <button id="assetPopupClose" title="Закрыть">×</button></div><input id="marketSearch" type="search" placeholder="Название или код..." autocomplete="off" aria-label="Поиск фьючерса"><div class="market-list" id="marketList"></div></div>
+    </section>
+    <section class="order-stack">
+     <div class="pane order-pane"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Открыть сделку</span></div>
+      <div class="order-content">
+       <label class="form-label">Инструмент</label>
+       <button id="assetSelector" class="native-field asset-native"><span id="ticketAssetIcon">◈</span><b id="ticketCode">MNQ</b><small id="ticketLabel">Индекс Nasdaq 100</small><span class="field-caret">▼</span></button>
+       <label class="form-label">Направление</label>
+       <div class="two-actions direction-actions"><button class="buy-btn selected" id="longButton">▲ Покупка</button><button class="sell-btn" id="shortButton">▼ Продажа</button></div>
+       <div class="form-help" id="directionHelp">Покупка приносит прибыль при росте цены.</div>
+       <label class="form-label">Количество контрактов</label>
+       <div class="qty-line"><button id="qtyDown" aria-label="Уменьшить количество">−</button><output id="quantity">1</output><button id="qtyUp" aria-label="Увеличить количество">+</button></div>
+       <div class="order-bottom-facts extended-facts"><div>Цена контракта <b id="marketPrice">—</b></div><div>Множитель <b id="multiplier">—</b></div><div>Номинал сделки <b id="notional">—</b></div><div>Обеспечение <b id="initialMargin">—</b></div><div>Комиссия при открытии <b id="fee">—</b></div><div>Свободно после сделки <b id="afterMargin">—</b></div><div>При изменении цены на 1% <b id="onePercent">—</b></div></div>
+       <div class="risk-hint" id="riskHint">Обеспечение — залог, а не предел убытка.</div>
+       <button class="buy-btn primary-trade" id="placeOrder">ОТКРЫТЬ ПОКУПКУ</button>
+       <div class="order-position-label" id="activeOrderPosition">Открытых позиций по инструменту нет</div>
+       <button class="control-subtle full-width" id="closeSelected" hidden>ЗАКРЫТЬ ПОЗИЦИЮ</button>
       </div>
+     </div>
+     <div class="pane timesales-pane"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Расчёт результата</span></div>
+      <div class="explain-pane-content" id="tradeExplainer"></div>
+     </div>
     </section>
-
-    <section class="view alternate-view" id="laboratory" aria-label="Лаборатория">
-      <header class="alt-title"><div><div class="eyebrow">WORKSPACE / 02</div><h1>Market Laboratory</h1><p>Фьючерсы, маржа, хеджирование и расчёты. Шесть практических сценариев.</p></div><div class="lab-progress"><span>SOLVED</span><strong id="labScore">0 / 6</strong></div></header>
-      <div class="lab-layout"><div id="labs" class="lab-cards"></div><aside class="pane glossary"><div class="pane-tabs"><button class="pane-tab active">REFERENCE</button></div><div class="glossary-content"><h3>NOTIONAL</h3><p>Цена × множитель × количество контрактов.</p><h3>INITIAL MARGIN</h3><p>Обеспечение для открытия сделки. Не ограничивает потенциальный убыток.</p><h3>UNREALIZED P&amp;L</h3><p>Финансовый результат открытой позиции.</p><h3>HEDGE</h3><p>Противоположная позиция для ограничения ценового риска.</p></div></aside></div>
+    <section class="pane dom-pane" id="scenariosPanel"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Экономические события</span><span class="pane-fill"></span><span class="pane-meta">5 СЦЕНАРИЕВ</span></div>
+     <div class="dom-contract-bar"><span>Как события могут влиять на цены</span></div>
+     <div class="dom-scroller scenario-scroller"><div id="scenarios" class="scenario-list"></div></div>
+     <div class="dom-footer scenario-footer"><div id="scenarioDetails" class="scenario-note">Выбери событие. Изменение цены в модели будет заданным, а не прогнозом реального рынка.</div><button class="control-subtle full-width" id="scenarioLesson">Изучить влияние новостей →</button></div>
     </section>
-
-    <section class="view alternate-view" id="journal" aria-label="Журнал">
-      <header class="alt-title"><div><div class="eyebrow">WORKSPACE / 03</div><h1>Trade Journal</h1><p>История сделок, рыночных сценариев и заметок симуляции.</p></div><button class="outline-danger" id="newSession">NEW SESSION / RESET</button></header>
-      <div class="journal-layout"><section class="pane"><div class="pane-tabs"><button class="pane-tab active">OPERATION LOG</button></div><div class="filters journal-filters" id="fullJournalFilters"><button class="active" data-kind="ALL">All</button><button data-kind="TRADE">Trades</button><button data-kind="EVENT">Events</button><button data-kind="NOTE">Notes</button></div><div id="fullLog" class="full-log"></div></section><aside class="pane journal-stats"><div class="pane-tabs"><button class="pane-tab active">SESSION STATS</button></div><div id="sessionStats"></div><button id="exportJournal" class="export-button">EXPORT CSV ↓</button></aside></div>
+    <section class="pane blotter-pane"><div class="blotter-tabs" id="blotterTabs"><button data-pane="accounts">Счёт</button><button data-pane="positions" class="active">Позиции</button><button data-pane="trades">Сделки</button><button data-pane="events">События</button><span class="pane-fill"></span></div>
+     <div class="blotter-body">
+      <div class="blotter-view" data-blotter="accounts"><div id="accountData"></div></div>
+      <div class="blotter-view active" data-blotter="positions"><div class="position-table-wrap"><table class="position-table"><thead><tr><th>Инструмент</th><th>Направление</th><th>Контракты</th><th>Цена входа</th><th>Сейчас</th><th>Результат</th><th>Действие</th></tr></thead><tbody id="positions"></tbody></table></div></div>
+      <div class="blotter-view" data-blotter="trades"><table class="trades-table"><thead><tr><th>Время</th><th>Инструмент</th><th>Кол-во</th><th>Направление</th><th>Цена входа</th><th>Цена выхода</th><th>Итог с комиссиями</th></tr></thead><tbody id="tradesRows"></tbody></table></div>
+      <div class="blotter-view" data-blotter="events"><div id="miniLog"></div></div>
+     </div><div class="blotter-footer"><span>УЧЕБНЫЙ СИМУЛЯТОР / СИНТЕТИЧЕСКИЕ ЦЕНЫ</span><span id="positionCount">0 позиций</span></div>
     </section>
-  </main>
-  <div class="status-footer"><span>MARKET / LAB · FUTURES DESK 1.2</span><span>OFFLINE / SYNTHETIC DATA</span><span class="status-right">Educational simulator · No live exchange connection</span></div>
+   </div>
+  </section>
+  <section class="view alternate-view" id="laboratory" aria-label="Обучение">
+   <header class="alt-title"><div><div class="eyebrow">РАЗДЕЛ / 02</div><h1>Обучение и практика</h1><p>Изучай механику фьючерсов, затем проверяй расчёты на задачах.</p></div><div class="lab-progress"><span>РЕШЕНО ВЕРНО</span><strong id="labScore">0 / 6</strong></div></header>
+   <div class="lab-layout"><div class="learning-main"><section class="pane lesson-pane"><div class="pane-tabs"><span class="pane-tab active">Теория · 6 коротких тем</span></div><div class="lesson-tabs" id="lessonTabs"></div><div class="lesson-body" id="lessonBody"></div></section><div class="lab-cards" id="labs"></div></div><aside class="pane glossary"><div class="pane-tabs"><span class="pane-tab active">СПРАВОЧНИК</span></div><div class="glossary-content"><h3>Фьючерс</h3><p>Контракт, результат которого зависит от цены базового актива. Здесь все расчёты виртуальные.</p><h3>Номинал</h3><p>Цена × множитель × количество контрактов.</p><h3>Обеспечение (маржа)</h3><p>Сумма, необходимая для удержания позиции. Это не лимит потерь.</p><h3>Прибыль и убыток</h3><p>Изменение цены × множитель × количество × направление сделки. Комиссии вычитаются отдельно.</p><h3>Хеджирование</h3><p>Сделка для уменьшения ценового риска другой позиции или будущей операции.</p></div></aside></div>
+  </section>
+  <section class="view alternate-view" id="journal" aria-label="История">
+   <header class="alt-title"><div><div class="eyebrow">РАЗДЕЛ / 03</div><h1>История торговли</h1><p>Сделки, комиссии, макроэкономические события и результаты учебной сессии.</p></div><button class="outline-danger" id="newSession">НОВАЯ СЕССИЯ</button></header>
+   <div class="journal-layout"><section class="pane"><div class="pane-tabs"><span class="pane-tab active">ЖУРНАЛ ОПЕРАЦИЙ</span></div><div class="filters journal-filters" id="fullJournalFilters"><button class="active" data-kind="ALL">Все</button><button data-kind="TRADE">Сделки</button><button data-kind="EVENT">События</button></div><div id="fullLog" class="full-log"></div></section><aside class="pane journal-stats"><div class="pane-tabs"><span class="pane-tab active">СТАТИСТИКА СЕССИИ</span></div><div id="sessionStats"></div><button id="exportJournal" class="export-button">СКАЧАТЬ ЖУРНАЛ (CSV) ↓</button></aside></div>
+  </section>
+ </main>
+ <div class="status-footer"><span>MARKET / LAB · УЧЕБНЫЙ ТЕРМИНАЛ</span><span>БЕЗ РЕАЛЬНЫХ ДЕНЕГ</span><span class="status-right">Сценарии условные, не инвестиционная рекомендация</span></div>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<div class="modal-overlay" id="modal" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">New Note</h2><button id="modalClose" aria-label="Закрыть">×</button></div><p id="modalDescription"></p><textarea id="modalTextarea" maxlength="500" rows="5"></textarea><div class="modal-buttons"><button id="modalCancel">CANCEL</button><button id="modalConfirm">CONFIRM</button></div></div></div>
+<div class="modal-overlay" id="modal" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">Новая сессия</h2><button id="modalClose" aria-label="Закрыть">×</button></div><p id="modalDescription"></p><div class="modal-buttons"><button id="modalCancel">ОТМЕНА</button><button id="modalConfirm">ПОДТВЕРДИТЬ</button></div></div></div>
 <script src="app.js" defer></script>
 </body>
 </html>
