@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1b1d22">
+<meta name="theme-color" content="#090b0e">
 <meta name="description" content="MARKET / LAB — учебный симулятор фьючерсов: сделки, риски, экономика и практика.">
 <title>MARKET / LAB — Лаборатория рынка</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -15,31 +15,31 @@
   <a class="brand" id="brandLink" href="#terminal" aria-label="Лаборатория рынка"><svg viewBox="0 0 48 44" width="40" height="37" aria-hidden="true"><path d="M5 33 17 11 28 24 43 4" fill="none" stroke="#d8ae43" stroke-width="3"/><path d="M4 17 15 30 26 9 38 20" fill="none" stroke="#bbc6d6" stroke-width="3"/></svg></a>
   <span class="account-select static-account">УЧЕБНЫЙ СЧЁТ <span>50 000 $</span></span>
   <div class="account-metrics" aria-label="Сводка счёта">
-   <div class="top-metric"><span>КАПИТАЛ:</span> <b id="equity">—</b></div>
-   <div class="top-metric"><span>СВОБОДНО:</span> <b id="freeMargin">—</b></div>
-   <div class="top-metric pnl-top"><span>РЕЗУЛЬТАТ:</span> <b id="totalPnl">—</b></div>
-   <div class="top-metric"><span>ПО ПОЗИЦИЯМ:</span> <b id="unrealizedPnl">—</b></div>
-   <div class="top-metric"><span>ОБЕСПЕЧЕНИЕ:</span> <b id="usedMargin">—</b></div>
-   <div class="top-metric progress-metric"><span>ДОЛЯ:</span> <b id="riskPct">—</b><span class="risk-track"><i id="riskBar"></i></span></div>
+   <div class="top-metric"><span>НА СЧЁТЕ:</span> <b id="equity">—</b></div>
+   <div class="top-metric"><span>ДОСТУПНО:</span> <b id="freeMargin">—</b></div>
+   <div class="top-metric pnl-top"><span>ИТОГ СДЕЛОК:</span> <b id="totalPnl">—</b></div>
+   <div class="top-metric"><span>ОТКРЫТО:</span> <b id="unrealizedPnl">—</b></div>
+   <div class="top-metric"><span>В ЗАЛОГЕ:</span> <b id="usedMargin">—</b></div>
+   <div class="top-metric progress-metric"><span>ДОЛЯ ЗАЛОГА:</span> <b id="riskPct">—</b><span class="risk-track"><i id="riskBar"></i></span></div>
   </div>
   <div class="header-spacer"></div>
   <span class="connection-label">СИМУЛЯЦИЯ <span class="signal">●</span></span>
   <button class="header-select lesson-shortcut" id="headerLearn">КАК ЭТО РАБОТАЕТ <span>›</span></button>
  </header>
  <nav class="rail" aria-label="Разделы">
-  <button data-view="terminal" class="rail-button active" title="Торговля" aria-label="Торговля">▥</button>
-  <button data-view="laboratory" class="rail-button" title="Обучение" aria-label="Обучение">⌁</button>
-  <button data-view="journal" class="rail-button" title="История" aria-label="История">☷</button>
+  <button data-view="terminal" class="rail-button active" title="Торговля" aria-label="Торговля"><span class="rail-glyph">▥</span><span class="rail-label">РЫНОК</span></button>
+  <button data-view="laboratory" class="rail-button" title="Обучение" aria-label="Обучение"><span class="rail-glyph">⌁</span><span class="rail-label">УРОКИ</span></button>
+  <button data-view="journal" class="rail-button" title="История" aria-label="История"><span class="rail-glyph">☷</span><span class="rail-label">ИСТОРИЯ</span></button>
   <div class="rail-separator"></div>
-  <button class="rail-button" id="assetPickerRail" title="Выбрать инструмент" aria-label="Выбрать инструмент">⌕</button>
-  <button class="rail-button" id="macroRail" title="Экономические события" aria-label="Экономические события">⚡</button>
+  <button class="rail-button" id="assetPickerRail" title="Выбрать инструмент" aria-label="Выбрать инструмент"><span class="rail-glyph">⌕</span><span class="rail-label">АКТИВ</span></button>
+  <button class="rail-button" id="macroRail" title="Экономические события" aria-label="Экономические события"><span class="rail-glyph">⚡</span><span class="rail-label">НОВОСТИ</span></button>
   <span class="rail-bottom">ML<br>2.1</span>
  </nav>
  <main class="workspace-main">
   <section class="view active" id="terminal" aria-label="Торговля">
    <div class="terminal-grid">
     <section class="pane chart-pane">
-     <div class="pane-tabs"><span class="pane-tab active">График цены</span><span class="pane-fill"></span><span class="pane-meta">УЧЕБНЫЕ КОТИРОВКИ</span></div>
+     <div class="pane-tabs"><span class="pane-tab active">График · движение цены</span><span class="pane-fill"></span><span class="pane-meta">УЧЕБНЫЕ КОТИРОВКИ</span></div>
      <div class="chart-toolbar">
       <button class="symbol-search" id="symbolPicker"><span>⌕</span> <b id="symbolTicker">MNQ</b><small>▾</small></button>
       <div class="toolbar-divider"></div>
@@ -47,39 +47,41 @@
       <div class="toolbar-divider"></div>
       <span class="plain-toolbar-text">Свечи</span>
       <span class="toolbar-flex"></span>
-      <button class="chart-mode-tool" id="helpChart" title="Что показывает график">? Как читать график</button>
+      <button class="chart-mode-tool" id="helpChart" title="Что показывает график">? Помощь с графиком</button>
      </div>
      <div class="quote-strip"><strong id="chartFullSymbol">MNQ · 15 мин</strong><span class="status-dot">●</span><span id="ohlc">—</span><span id="priceChange">—</span></div>
      <div class="chart-stage">
       <div class="drawing-rail learning-rail" aria-label="Подсказки к графику"><button data-lesson="0" title="Что такое фьючерс">①</button><button data-lesson="1" title="Что такое длинная и короткая позиция">②</button><button data-lesson="2" title="Как считается результат">③</button><button data-lesson="3" title="Что такое маржа">④</button><span></span><button data-lesson="4" title="Влияние экономических событий">⑤</button></div>
       <div class="chart-canvas-wrap"><div class="chart-watermark" aria-hidden="true"><strong id="watermarkTicker">MNQ</strong><span id="watermarkContract">ФЬЮЧЕРС</span></div><canvas id="priceChart" role="img" aria-label="Учебный свечной график"></canvas><div class="chart-crosshair" id="chartTooltip" hidden></div><div class="chart-last-overlay" id="lastPrice" hidden></div><div class="chart-floating-tools" id="autoIndicator">УЧЕБНЫЙ РЫНОК</div></div>
      </div>
-     <div class="chart-footer"><div class="range-tabs" id="rangeTabs"><button data-range="32">32 свечи</button><button data-range="64" class="active">64 свечи</button><button data-range="128">Все</button></div><span class="chart-spacer"></span><button class="control-subtle" id="tickOne">+ 1 СВЕЧА</button><button class="control-subtle" id="tickTen">+ 10</button><button class="control-subtle" id="autoPlay">▶ АВТО</button><span class="chart-clock" id="timeNow">—</span></div>
+     <div class="chart-footer"><div class="range-tabs" id="rangeTabs"><button data-range="32">32 свечи</button><button data-range="64" class="active">64 свечи</button><button data-range="128">Все</button></div><span class="chart-spacer"></span><button class="control-subtle" id="tickOne" title="Продвинуть учебный рынок на один шаг">+ 1 ШАГ</button><button class="control-subtle" id="tickTen" title="Продвинуть рынок на десять шагов">+ 10 ШАГОВ</button><button class="control-subtle" id="autoPlay" title="Автоматически двигать цену">▶ ЗАПУСТИТЬ</button><span class="chart-clock" id="timeNow">—</span></div>
      <div class="asset-popup" id="assetPopup" hidden><div class="asset-popup-title">ВЫБОР ФЬЮЧЕРСА <button id="assetPopupClose" title="Закрыть">×</button></div><input id="marketSearch" type="search" placeholder="Название или код..." autocomplete="off" aria-label="Поиск фьючерса"><div class="market-list" id="marketList"></div></div>
     </section>
     <section class="order-stack">
-     <div class="pane order-pane"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Открыть сделку</span></div>
+     <div class="pane order-pane"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Новая сделка</span></div>
       <div class="order-content">
-       <label class="form-label">Инструмент</label>
+       <label class="form-label step-label">1. Что торгуем?</label>
        <button id="assetSelector" class="native-field asset-native"><span id="ticketAssetIcon">◈</span><b id="ticketCode">MNQ</b><small id="ticketLabel">Индекс Nasdaq 100</small><span class="field-caret">▼</span></button>
-       <label class="form-label">Направление</label>
-       <div class="two-actions direction-actions"><button class="buy-btn selected" id="longButton">▲ Покупка</button><button class="sell-btn" id="shortButton">▼ Продажа</button></div>
+       <label class="form-label step-label">2. Как изменится цена?</label>
+       <div class="two-actions direction-actions"><button class="buy-btn selected" id="longButton" title="Прибыль при росте цены">▲ На рост</button><button class="sell-btn" id="shortButton" title="Прибыль при снижении цены">▼ На падение</button></div>
        <div class="form-help" id="directionHelp">Покупка приносит прибыль при росте цены.</div>
-       <label class="form-label">Количество контрактов</label>
+       <label class="form-label step-label">3. Сколько контрактов?</label>
        <div class="qty-line"><button id="qtyDown" aria-label="Уменьшить количество">−</button><output id="quantity">1</output><button id="qtyUp" aria-label="Увеличить количество">+</button></div>
-       <div class="order-bottom-facts extended-facts"><div>Цена контракта <b id="marketPrice">—</b></div><div>Множитель <b id="multiplier">—</b></div><div>Номинал сделки <b id="notional">—</b></div><div>Обеспечение <b id="initialMargin">—</b></div><div>Комиссия при открытии <b id="fee">—</b></div><div>Свободно после сделки <b id="afterMargin">—</b></div><div>При изменении цены на 1% <b id="onePercent">—</b></div></div>
+       <div class="order-bottom-facts extended-facts"><div>Цена контракта <b id="marketPrice">—</b></div><div>Множитель <b id="multiplier">—</b></div><div>Общий размер сделки <b id="notional">—</b></div><div class="key-fact">Нужно для открытия <b id="initialMargin">—</b></div><div>Комиссия при открытии <b id="fee">—</b></div><div>Останется доступно <b id="afterMargin">—</b></div><div class="loss-fact">Если цена пойдёт против на 1% <b id="onePercent">—</b></div></div>
        <div class="risk-hint" id="riskHint">Обеспечение — залог, а не предел убытка.</div>
-       <button class="buy-btn primary-trade" id="placeOrder">ОТКРЫТЬ ПОКУПКУ</button>
+      </div>
+      <div class="trade-action-footer">
        <div class="order-position-label" id="activeOrderPosition">Открытых позиций по инструменту нет</div>
+       <button class="buy-btn primary-trade" id="placeOrder">ОТКРЫТЬ ПОКУПКУ</button>
        <button class="control-subtle full-width" id="closeSelected" hidden>ЗАКРЫТЬ ПОЗИЦИЮ</button>
       </div>
      </div>
-     <div class="pane timesales-pane"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Расчёт результата</span></div>
+     <div class="pane timesales-pane"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Как считается результат</span></div>
       <div class="explain-pane-content" id="tradeExplainer"></div>
      </div>
     </section>
-    <section class="pane dom-pane" id="scenariosPanel"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Экономические события</span><span class="pane-fill"></span><span class="pane-meta">5 СЦЕНАРИЕВ</span></div>
-     <div class="dom-contract-bar"><span>Как события могут влиять на цены</span></div>
+    <section class="pane dom-pane" id="scenariosPanel"><div class="pane-tabs"><span class="pane-tab active"><span class="tab-ball">◉</span> Сценарии экономики</span><span class="pane-fill"></span><span class="pane-meta">5 СЦЕНАРИЕВ</span></div>
+     <div class="dom-contract-bar"><span>Выбери событие и посмотри, как изменятся цены.</span></div>
      <div class="dom-scroller scenario-scroller"><div id="scenarios" class="scenario-list"></div></div>
      <div class="dom-footer scenario-footer"><div id="scenarioDetails" class="scenario-note">Выбери событие. Изменение цены в модели будет заданным, а не прогнозом реального рынка.</div><button class="control-subtle full-width" id="scenarioLesson">Изучить влияние новостей →</button></div>
     </section>
