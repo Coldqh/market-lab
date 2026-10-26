@@ -1,3 +1,4 @@
+import { INSTRUMENTS, snapCandle, snapPrice, cents, dollars, notionalCents, marginCents, feeCents, grossPnlCents, ledgerBalanceCents, appendEntry, freeMarginCents, canOpenPosition } from './core/finance.mjs';
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -6,13 +7,10 @@ const num = (n,d=2) => Number(n).toLocaleString('ru-RU',{minimumFractionDigits:d
 const signedMoney = n => (n>=0?'+':'−')+money(Math.abs(n));
 const pct = n => (n>=0?'+':'−')+num(Math.abs(n),2)+'%';
 const escapeHtml = v => String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const STORE='marketlab-education-workstation-v4'; // старая версия сохранения не стирается
-const START=50000, FEE_RATE=.000025;
-const assets={
- MNQ:{name:'Микрофьючерс на Nasdaq 100',small:'Индекс США · технологии',start:24834.25,ref:24834.25,vol:.00075,mult:2,unit:'пункт',margin:.04,precision:2,icon:'◈'},
- CL:{name:'Фьючерс на нефть WTI',small:'Энергетика · нефть',start:78.24,ref:78.24,vol:.0035,mult:1000,unit:'баррель',margin:.065,precision:2,icon:'◉'},
- GC:{name:'Фьючерс на золото',small:'Металлы · золото',start:2336.80,ref:2336.80,vol:.0012,mult:100,unit:'унция',margin:.025,precision:2,icon:'◆'}
-};
+const STORE='marketlab-education-workstation-v5';
+const LEGACY_STORE='marketlab-education-workstation-v4'; // старое сохранение остаётся
+const START=50000;
+const assets=INSTRUMENTS;
 const assetDefs=assets; // используется прежним свечным рендерером
 const scenarios=[
  {icon:'ϟ',title:'ФРС повышает ставки',effect:'Давление на акции, возможное снижение золота.',why:'Более дорогие кредиты могут сдерживать инвестиции и снижать оценку компаний. Реакция зависит от ожиданий рынка.',moves:{MNQ:-.034,CL:-.010,GC:-.012}},
@@ -39,29 +37,55 @@ const tasks=[
 ];
 let rng=289503, state, timer=null,chartMode='candle',indicator=false,selectedFrame=15,selectedRange=64,hoverCandle=-1,chartPositions=[],filterFull='ALL',activeLesson=0,modalOpen=false;
 function random(){rng=(Math.imul(rng,1664525)+1013904223)>>>0;return rng/4294967296;}
-function makeCandle(prev,vol,move=null){const delta=move===null?(random()-.51)*vol*2:move,close=Math.max(.005,prev*(1+delta)),extra=vol*(.08+random()*.34);return {o:prev,c:close,h:Math.max(prev,close)*(1+extra),l:Math.max(.001,Math.min(prev,close)*(1-extra)),v:Math.round(40+random()*200)};}
-function init(){rng=289503;state={cash:START,selected:'MNQ',side:1,qty:1,positions:[],trades:[],logs:[],candles:{},realized:0,fees:0,wins:0,closed:0,shocks:0,ticks:0,answered:{},version:4};for(const [key,a] of Object.entries(assets)){let p=a.start,c=[];for(let i=0;i<90;i++){const bar=makeCandle(p,a.vol,i===89?0:null);c.push(bar);p=bar.c;}const scale=a.start/p;state.candles[key]=c.map(v=>({o:v.o*scale,c:v.c*scale,h:v.h*scale,l:v.l*scale,v:v.v}));}addLog('INFO','Сессия создана','Стартовый капитал 50 000 $; котировки синтетические.');save();}
-function load(){try{const d=JSON.parse(localStorage.getItem(STORE));if(!d||d.version!==4||!d.candles||!assets[d.selected]||!Array.isArray(d.positions)||!Array.isArray(d.logs))return false;for(const k of Object.keys(assets)){if(!Array.isArray(d.candles[k])||d.candles[k].length<10)return false;}state=d;rng=Number.isSafeInteger(d.rng)?d.rng:289503;return true;}catch{return false;}}
+function makeCandle(key,prev,vol,move=null){const delta=move===null?(random()-.51)*vol*2:move,close=Math.max(.005,prev*(1+delta)),extra=vol*(.08+random()*.34);return snapCandle(key,{o:prev,c:close,h:Math.max(prev,close)*(1+extra),l:Math.max(.001,Math.min(prev,close)*(1-extra)),v:Math.round(40+random()*200)});}
+function init(){
+ rng=289503;
+ state={cash:START,selected:'MNQ',side:1,qty:1,positions:[],trades:[],logs:[],candles:{},realized:0,fees:0,wins:0,closed:0,shocks:0,ticks:0,answered:{},version:5,ledger:[{id:'opening',kind:'opening',amountCents:cents(START),ref:'session'}]};
+ for(const [key,a] of Object.entries(assets)){
+  let p=a.start,bars=[];
+  for(let i=0;i<90;i++){const bar=makeCandle(key,p,a.vol,i===89?0:null);bars.push(bar);p=bar.c;}
+  const scale=a.start/p;
+  state.candles[key]=bars.map(b=>snapCandle(key,{o:b.o*scale,c:b.c*scale,h:b.h*scale,l:b.l*scale,v:b.v}));
+ }
+ addLog('INFO','Сессия создана','Стартовый капитал 50 000 $; котировки синтетические.');save();
+}
+function load(){
+ try{
+  const d=JSON.parse(localStorage.getItem(STORE)||localStorage.getItem(LEGACY_STORE));
+  if(!d||(d.version!==4&&d.version!==5)||!d.candles||!assets[d.selected]||!Array.isArray(d.positions)||!Array.isArray(d.logs))return false;
+  for(const k of Object.keys(assets))if(!Array.isArray(d.candles[k])||d.candles[k].length<10)return false;
+  const migrate=d.version===4||!Array.isArray(d.ledger);
+  if(migrate){
+   d.version=5;d.ledger=[{id:'carryover',kind:'carryover',amountCents:cents(d.cash),ref:'legacy-v4'}];
+   for(const k of Object.keys(assets))d.candles[k]=d.candles[k].map(b=>snapCandle(k,b));
+   for(const p of d.positions)p.entry=snapPrice(p.key,p.entry);
+  }
+  state=d;rng=Number.isSafeInteger(d.rng)?d.rng:289503;
+  state.cash=dollars(ledgerBalanceCents(state.ledger));
+  if(migrate)save();return true;
+ }catch{return false;}
+}
 function save(){try{state.rng=rng;localStorage.setItem(STORE,JSON.stringify(state));}catch{}}
 function last(key){return state.candles[key].at(-1).c;}
-function positionPnl(p){return (last(p.key)-p.entry)*assets[p.key].mult*p.qty*p.side;}
-function equity(){return state.cash+state.positions.reduce((s,p)=>s+positionPnl(p),0);}
-function usedMargin(){return state.positions.reduce((s,p)=>s+p.margin,0);}
-function freeMargin(){return equity()-usedMargin();}
-function fee(key,q,price){return price*assets[key].mult*q*FEE_RATE;}
+function positionPnl(p){return dollars(grossPnlCents(p.key,p.entry,last(p.key),p.qty,p.side));}
+function equity(){return dollars(cents(state.cash)+state.positions.reduce((s,p)=>s+grossPnlCents(p.key,p.entry,last(p.key),p.qty,p.side),0));}
+function usedMargin(){return dollars(state.positions.reduce((s,p)=>s+cents(p.margin),0));}
+function freeMargin(){return dollars(freeMarginCents(cents(equity()),cents(usedMargin())));}
+function fee(key,q,price){return dollars(feeCents(key,price,q));}
+function ledgerPost(kind,amountCents,ref){const entry={id:'entry-'+(state.ledger.length+1),kind,amountCents,ref:String(ref)};state.ledger=appendEntry(state.ledger,entry);state.cash=dollars(ledgerBalanceCents(state.ledger));}
 function now(){return new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
 function addLog(kind,title,desc,amount=null){state.logs.unshift({kind,title,desc,time:now(),amount});state.logs=state.logs.slice(0,250);}
 function notify(text){const t=$('toast');t.textContent=text;t.classList.add('visible');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('visible'),3000);}
-function tick(count=1,changes=null){for(let i=0;i<count;i++){for(const [key,a] of Object.entries(assets)){const c=state.candles[key];c.push(makeCandle(last(key),a.vol,changes?.[key]??null));if(c.length>550)c.shift();}state.ticks++;checkMargin();}save();render();}
+function tick(count=1,changes=null){for(let i=0;i<count;i++){for(const [key,a] of Object.entries(assets)){const c=state.candles[key];c.push(makeCandle(key,last(key),a.vol,changes?.[key]??null));if(c.length>550)c.shift();}state.ticks++;checkMargin();}save();render();}
 function scenarioRun(i){const ev=scenarios[i];if(!ev)return;tick(1,ev.moves);state.shocks++;addLog('EVENT',ev.title,Object.entries(ev.moves).map(([key,m])=>`${key}: ${pct(m*100)}`).join('; '));save();render();notify('Сценарий применён: '+ev.title);}
 function checkMargin(){if(!state.positions.length)return;const threshold=usedMargin()*.75;if(equity()<threshold){state.positions.slice().forEach(p=>close(p,true,true));addLog('EVENT','Принудительное закрытие','Средства ниже 75% обеспечения.');notify('Позиции закрыты: недостаточно средств.');}}
-function open(side){const key=state.selected,a=assets[key],price=last(key),q=state.qty,margin=price*a.mult*q*a.margin,commission=fee(key,q,price);
+function open(side){const key=state.selected,a=assets[key],price=last(key),q=state.qty,margin=dollars(marginCents(key,price,q)),commission=fee(key,q,price);
  if(state.positions.some(p=>p.key===key)){notify('По этому инструменту уже есть открытая позиция.');return false;}
- if(equity()<=0||freeMargin()<margin+commission){notify('Недостаточно свободных средств для обеспечения.');return false;}
- const pos={id:Date.now()+Math.floor(random()*100000),key,side,qty:q,entry:price,margin,openFee:commission,time:now()};state.cash-=commission;state.fees+=commission;state.realized-=commission;state.positions.push(pos);state.side=side;
+ if(!canOpenPosition(cents(equity()),cents(freeMargin()),marginCents(key,price,q),feeCents(key,price,q))){notify('Недостаточно свободных средств для обеспечения.');return false;}
+ const pos={id:Date.now()+Math.floor(random()*100000),key,side,qty:q,entry:price,margin,openFee:commission,time:now()};ledgerPost('entry_fee',-feeCents(key,price,q),pos.id);state.fees=dollars(cents(state.fees)+cents(commission));state.realized=dollars(cents(state.realized)-cents(commission));state.positions.push(pos);state.side=side;
  addLog('TRADE',`${side===1?'Покупка':'Продажа'} ${key}`,`${q} контрактов по ${num(price,a.precision)}; комиссия ${money(commission)}`,-commission);save();render();setBlotter('positions');notify('Позиция открыта. Результат изменится вместе с ценой.');return true;}
 function close(p,forced=false,batch=false){if(!state.positions.some(x=>x.id===p.id))return;const out=last(p.key),gross=positionPnl(p),exitFee=fee(p.key,p.qty,out),openFee=p.openFee??fee(p.key,p.qty,p.entry),net=gross-openFee-exitFee;
- state.cash+=gross-exitFee;state.realized+=gross-exitFee;state.fees+=exitFee;state.closed++;if(net>0)state.wins++;
+ ledgerPost('trade_pnl',cents(gross),p.id);ledgerPost('exit_fee',-feeCents(p.key,out,p.qty),p.id);state.realized=dollars(cents(state.realized)+cents(gross)-cents(exitFee));state.fees=dollars(cents(state.fees)+cents(exitFee));state.closed++;if(net>0)state.wins++;
  state.positions=state.positions.filter(x=>x.id!==p.id);state.trades.unshift({key:p.key,side:p.side,qty:p.qty,entry:p.entry,exit:out,fees:exitFee+openFee,net,time:now(),forced});state.trades=state.trades.slice(0,150);
  addLog('TRADE',`${forced?'Принудительное закрытие':'Закрытие'} ${p.key}`,`${p.qty} контрактов; результат после комиссий ${signedMoney(net)}`,net);save();if(!batch){render();notify(`Позиция закрыта · ${signedMoney(net)}`);}}
 function setView(name){if(!['terminal','laboratory','journal'].includes(name))return;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal')requestAnimationFrame(renderChart);window.scrollTo(0,0);}
@@ -72,7 +96,7 @@ function renderPicker(){const q=$('marketSearch').value.trim().toLocaleLowerCase
 function renderMetrics(){const up=state.positions.reduce((s,p)=>s+positionPnl(p),0),eq=equity(),margin=usedMargin(),free=freeMargin();
  $('equity').textContent=money(eq);$('freeMargin').textContent=money(free);$('totalPnl').textContent=signedMoney(state.realized);$('totalPnl').className=state.realized>=0?'up':'down';$('unrealizedPnl').textContent=signedMoney(up);$('unrealizedPnl').className=up>=0?'up':'down';$('usedMargin').textContent=money(margin);$('riskPct').textContent=num(eq>0?margin/eq*100:100,1)+'%';$('riskBar').style.width=Math.max(0,Math.min(100,eq>0?margin/eq*100:100))+'%';}
 function renderHeader(){const key=state.selected,a=assets[key],bars=state.candles[key],c=bars.at(-1),prev=bars.at(-2)||c;$('symbolTicker').textContent=key;$('watermarkTicker').textContent=key;$('watermarkContract').textContent=a.small;$('chartFullSymbol').textContent=a.name+' · '+(selectedFrame===15?'15 мин':selectedFrame===60?'1 час':'4 часа');$('ohlc').textContent=`О ${num(c.o,a.precision)} · МАКС ${num(c.h,a.precision)} · МИН ${num(c.l,a.precision)} · З ${num(c.c,a.precision)}`;$('priceChange').textContent=pct((c.c/prev.c-1)*100);$('priceChange').className=c.c>=prev.c?'up':'down';$('ticketAssetIcon').textContent=a.icon;$('ticketCode').textContent=key;$('ticketLabel').textContent=a.small;$('timeNow').textContent=now()+' / СИМ';}
-function renderTicket(){const k=state.selected,a=assets[k],price=last(k),n=price*a.mult*state.qty,margin=n*a.margin,comm=fee(k,state.qty,price),pos=state.positions.find(p=>p.key===k);const rows=[['marketPrice',num(price,a.precision)],['multiplier',`${money(a.mult)} / ${a.unit}`],['notional',money(n)],['initialMargin',money(margin)],['fee',money(comm)],['afterMargin',money(freeMargin()-margin-comm)],['onePercent',`−${money(n*.01)}`]];rows.forEach(([id,v])=>$(id).textContent=v);
+function renderTicket(){const k=state.selected,a=assets[k],price=last(k),n=dollars(notionalCents(k,price,state.qty)),margin=dollars(marginCents(k,price,state.qty)),comm=fee(k,state.qty,price),pos=state.positions.find(p=>p.key===k);const rows=[['marketPrice',num(price,a.precision)],['multiplier',`${money(a.mult)} / ${a.unit}`],['notional',money(n)],['initialMargin',money(margin)],['fee',money(comm)],['afterMargin',money(freeMargin()-margin-comm)],['onePercent',`−${money(n*.01)}`]];rows.forEach(([id,v])=>$(id).textContent=v);
  $('quantity').textContent=state.qty;$('longButton').classList.toggle('selected',state.side===1);$('shortButton').classList.toggle('selected',state.side===-1);$('directionHelp').textContent=state.side===1?'Ты рассчитываешь на рост цены. При падении будет убыток.':'Ты рассчитываешь на падение цены. При росте будет убыток.';$('placeOrder').textContent=state.side===1?'ОТКРЫТЬ НА РОСТ':'ОТКРЫТЬ НА ПАДЕНИЕ';$('placeOrder').classList.toggle('sell-btn',state.side===-1);$('placeOrder').classList.toggle('buy-btn',state.side===1);
  $('placeOrder').disabled=!!pos||freeMargin()<margin+comm||equity()<=0;$('closeSelected').hidden=!pos;$('placeOrder').hidden=!!pos;$('activeOrderPosition').textContent=pos?`${pos.side===1?'Покупка':'Продажа'} ${pos.qty} × ${num(pos.entry,a.precision)} · сейчас ${signedMoney(positionPnl(pos))}`:'Открытых позиций по инструменту нет';$('riskHint').textContent=margin>freeMargin()?'Недостаточно денег: уменьшите число контрактов или выберите другой инструмент.':`Залог ${money(margin)} не ограничивает убыток. Комиссия ${money(comm)} будет списана при открытии.`;
  $('tradeExplainer').innerHTML=pos?`<div class="explain-row"><span>Открытая позиция</span><b>${pos.side===1?'Покупка':'Продажа'} · ${pos.qty} шт.</b></div><div class="explain-row"><span>Цена входа</span><b>${num(pos.entry,a.precision)}</b></div><div class="explain-row"><span>Текущая цена</span><b>${num(price,a.precision)}</b></div><div class="explain-row"><span>Результат до закрытия</span><b class="${positionPnl(pos)>=0?'up':'down'}">${signedMoney(positionPnl(pos))}</b></div><p>(${num(price,a.precision)} − ${num(pos.entry,a.precision)}) × ${a.mult} × ${pos.qty} × ${pos.side===1?'1':'−1'} = ${signedMoney(positionPnl(pos))}. Комиссия закрытия ещё не учтена.</p>`:`<p>Ты выбираешь <b>${state.side===1?'рост':'падение'}</b> цены. Сумма результата зависит от числа контрактов.</p><div class="explain-row"><span>Если угадаешь направление на 1%</span><b class="up">+${money(n*.01)}</b></div><div class="explain-row"><span>Если ошибёшься на 1%</span><b class="down">−${money(n*.01)}</b></div><p>Открой позицию и нажми «+ 1 шаг» под графиком. Комиссии уменьшат результат.</p>`;}
