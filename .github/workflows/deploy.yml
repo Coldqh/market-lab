@@ -25,10 +25,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Verify financial logic
+        run: npm run check
+
       - name: Prepare website
         run: |
           mkdir -p dist
           cp index.html styles.css app.js favicon.svg dist/
+          mkdir -p dist/core
+          cp core/finance.mjs dist/core/
           touch dist/.nojekyll
 
       - name: Configure Pages
