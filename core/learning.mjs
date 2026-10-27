@@ -49,7 +49,7 @@ export function ensureLearningState(value,legacyAnswers={}){
  return base;
 }
 const money=v=>Number(v).toLocaleString('ru-RU',{maximumFractionDigits:2})+' $';
-function questionData(id,rand){
+function questionData(id,rand,round){
  const price=100+Math.floor(rand()*110),q=1+Math.floor(rand()*4),move=1+Math.floor(rand()*10);
  if(id==='long-pnl'){
   const mult=select(rand,[5,10,20]),answer=move*q*mult;
@@ -70,7 +70,7 @@ function questionData(id,rand){
    explain:money(notional)+' × '+pct+'% = '+money(answer)+' убытка. Залог не ограничивает риск.'};
  }
  if(id==='hedge'){
-  const producer=rand()<.5;
+  const producer=round%2===0;
   return {question:producer?'Производитель нефти опасается падения цены будущей добычи. Какой фьючерсный хедж обычно частично уменьшает его ценовой риск?':'Авиакомпания опасается роста стоимости топлива. Какой фьючерсный хедж может частично защитить её от подорожания?',
    answer:producer?1:0,
    options:['Покупка нефтяного фьючерса','Продажа нефтяного фьючерса','Покупка фондового индекса','Покупка золота'],
@@ -85,7 +85,7 @@ function questionData(id,rand){
  if(id==='notional'){
   const price=4800+Math.floor(rand()*10)*100,mult=select(rand,[10,20,50]),qty=select(rand,[1,2,3]),answer=price*mult*qty;
   return {question:'Фьючерс стоит '+price+' пунктов, множитель '+mult+' $ за пункт. Куплено '+qty+' контракт(а). Чему равен номинал позиции?',
-   answer,options:[answer,price*qty,price*mult,answer*10].map(money),
+   answer,options:[answer,price*qty,price*mult*(qty===1?2:1),answer*10].map(money),
    explain:price+' × '+mult+' × '+qty+' = '+money(answer)+'. Номинал не равен марже.'};
  }
  throw new RangeError('Неизвестный навык: '+id);
@@ -94,7 +94,7 @@ export function buildQuestion(id,round=0,seed=289503){
  if(!SKILL_IDS.has(id)||!positiveInt(round)||round>100000000||!positiveInt(seed))throw new RangeError('Некорректный идентификатор или вариант задания');
  const salt=SKILLS.findIndex(s=>s.id===id)+1;
  const random=prng((seed+Math.imul(salt,2654435761)+Math.imul(round+1,2246822519))>>>0);
- const q=questionData(id,random),skill=SKILLS[salt-1];
+ const q=questionData(id,random,round),skill=SKILLS[salt-1];
  // Duplicated distractors are replaced deterministically without changing the right answer.
  const candidates=q.options;
  if(new Set(candidates).size<4){
