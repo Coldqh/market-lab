@@ -39,7 +39,7 @@ test('Margin is computed from actual ticket direction, quantity and modeled exec
  assert.equal(expected.expected,10401.3);
  let s=startLab(createLabState(),'margin');
  assert.equal(submitLabNumber(s,'margin',x,'10401,30').correct,true);
- assert.throws(()=>numericLabContext('margin',{...x,quantity:0}),/unavailable|Укажите/);
+ assert.match(numericLabContext('margin',{...x,quantity:0}).unavailable,/Укажите/);
 });
 test('Full trade must be the same LONG followed by at least one market step and manual close',()=>{
  let s=startLab(createLabState(),'trade-cycle');
