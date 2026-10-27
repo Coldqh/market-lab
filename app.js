@@ -253,7 +253,7 @@ function showLesson(i){
  const skillCount=SKILLS.filter(s=>s.lesson===i).length;
  const topicProgress=skillCount?'Навыки по теме: '+completed.length+'/'+skillCount+'.':'Тема закрепляется практикой в терминале.';
  const milestone=PRACTICE.map(p=>`${state.learning.actions[p.id]>0?'✓':'○'} ${p.title}`).join(' · ');
- $('lessonBody').innerHTML=`<h2>${escapeHtml(l.title)}</h2><p>${escapeHtml(l.intro)}</p><p>${escapeHtml(l.body)}</p><div class="lesson-formula">${escapeHtml(l.formula)}</div><p class="lesson-next"><b>Попробуй:</b> ${escapeHtml(l.next)}</p><p>${escapeHtml(topicProgress)} Действия в терминале: ${progress.practiced}/${progress.practiceTotal}.</p><p>${escapeHtml(milestone)}</p><div class="lesson-actions"><button id="goToTerminal" class="control-subtle">К ТОРГОВЛЕ</button><button id="lessonNext" class="control-subtle">${i===lessons.length-1?'К ЗАДАНИЯМ':'СЛЕДУЮЩАЯ ТЕМА'} →</button></div>`;
+ $('lessonBody').innerHTML=`<h2>${escapeHtml(l.title)}</h2><p>${escapeHtml(l.intro)}</p><p>${escapeHtml(l.body)}</p><div class="lesson-formula">${escapeHtml(l.formula)}</div><p><b>Пример:</b> ${escapeHtml(l.example)}</p><p><b>Не путай:</b> ${escapeHtml(l.pitfall)}</p><p class="lesson-next"><b>Попробуй:</b> ${escapeHtml(l.next)}</p><p>${escapeHtml(topicProgress)} Действия в терминале: ${progress.practiced}/${progress.practiceTotal}.</p><div class="lesson-actions"><button id="goToTerminal" class="control-subtle">К ТОРГОВЛЕ</button><button id="lessonNext" class="control-subtle">${i===lessons.length-1?'К ЗАДАНИЯМ':'СЛЕДУЮЩАЯ ТЕМА'} →</button></div>`;
  renderGuidedLab(i);
  $('lessonTabs').querySelectorAll('[data-lesson-tab]').forEach(b=>b.onclick=()=>showLesson(+b.dataset.lessonTab));
  $('goToTerminal').onclick=()=>setView('terminal');
