@@ -33,7 +33,7 @@ jobs:
           mkdir -p dist
           cp index.html styles.css app.js favicon.svg dist/
           mkdir -p dist/core
-          cp core/finance.mjs core/risk.mjs core/market.mjs dist/core/
+          cp core/finance.mjs core/risk.mjs core/market.mjs core/learning.mjs dist/core/
           touch dist/.nojekyll
 
       - name: Configure Pages
