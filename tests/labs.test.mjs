@@ -31,7 +31,7 @@ test('Position P&L uses actual position, instrument and mark, not invented data'
  const context={symbol:'MNQ',price:20010,position:p};
  assert.equal(numericLabContext('position-pnl',context).expected,-40);
  assert.equal(submitLabNumber(s,'position-pnl',context,'-40').correct,true);
- assert.throws(()=>submitLabNumber(s,'position-pnl',context,'-40.01'),/Выполнена|выполнена|уже/);
+ assert.throws(()=>submitLabNumber(submitLabNumber(s,'position-pnl',context,'-40').state,'position-pnl',context,'-40.01'),/выполнена|уже/);
 });
 test('Margin is computed from actual ticket direction, quantity and modeled execution',()=>{
  const x={symbol:'CL',price:80,quantity:2,side:1};
