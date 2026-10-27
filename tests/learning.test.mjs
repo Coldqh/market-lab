@@ -73,3 +73,36 @@ test('Reject invalid skill identifiers and answers',()=>{
  assert.throws(()=>nextQuestion(l,'hedge'),/Сначала/);
  assert.throws(()=>recordPractice(l,'buy','1'),RangeError);
 });
+
+
+test('All numerical correct options agree with the data shown to the student',()=>{
+ const amount=(text)=>Number(String(text).replace(/[^\d,.-]/g,'').replace(',','.'));
+ for(let round=0;round<200;round++){
+  let q=buildQuestion('long-pnl',round,1234);
+  let m=/Куплены (\d+) контр\. по (\d+) пунктов\. Множитель (\d+) \$\/пункт\. Цена выросла до (\d+)/.exec(q.question);
+  assert.ok(m,q.question);
+  assert.equal(amount(q.options[q.correct]),(Number(m[4])-Number(m[2]))*Number(m[3])*Number(m[1]));
+  q=buildQuestion('short-pnl',round,1234);
+  m=/на (\d+) баррелей по (\d+) \$\. Цена упала до (\d+) \$/.exec(q.question);
+  assert.ok(m,q.question);
+  assert.equal(amount(q.options[q.correct]),(Number(m[2])-Number(m[3]))*Number(m[1]));
+  q=buildQuestion('margin-loss',round,1234);
+  m=/Номинал длинной позиции ([\d\s\u00a0\u202f]+) \$, обеспечение ([\d\s\u00a0\u202f]+) \$\. Цена снизилась на (\d+)%/.exec(q.question);
+  assert.ok(m,q.question);
+  assert.equal(amount(q.options[q.correct]),amount(m[1])*Number(m[3])/100);
+  q=buildQuestion('leverage',round,1234);
+  m=/Номинал покупки ([\d\s\u00a0\u202f]+) \$, обеспечение ([\d\s\u00a0\u202f]+) \$\. Цена снизилась на (\d+)%/.exec(q.question);
+  assert.ok(m,q.question);
+  assert.equal(amount(q.options[q.correct]),amount(m[1])*Number(m[3])/amount(m[2]));
+  q=buildQuestion('notional',round,1234);
+  m=/Фьючерс стоит (\d+) пунктов, множитель (\d+) \$ за пункт\. Куплено (\d+) контракт/.exec(q.question);
+  assert.ok(m,q.question);
+  assert.equal(amount(q.options[q.correct]),Number(m[1])*Number(m[2])*Number(m[3]));
+ }
+});
+test('Hedge practice alternates producer and fuel consumer on successive rounds',()=>{
+ const a=buildQuestion('hedge',0,111),b=buildQuestion('hedge',1,111);
+ assert.notEqual(a.question,b.question);
+ assert.match(a.options[a.correct],/Продажа/);
+ assert.match(b.options[b.correct],/Покупка/);
+});
