@@ -368,6 +368,21 @@ function renderChart(){const canvas=$('priceChart');if(!canvas || !canvas.getCli
  ctx.fillStyle='#b3becc';ctx.font='9px Arial, sans-serif';const xLabels=w<530?3:5;for(let i=0;i<xLabels;i++){const idx=Math.floor(i*(points.length-1)/(xLabels-1));const x=left+unit*(idx+.5);if(!points[idx])continue;const at=points[idx].t;const day=new Date(at).getUTCDate();const prev=idx>0?new Date(points[idx-1].t).getUTCDate():day;const stamp=(i===0||day!==prev)?formatSimTime(at).slice(0,5)+' '+formatSimTime(at,false):formatSimTime(at,false);ctx.fillText(stamp,Math.min(x,w-right-58),h-14)}
  if(hoverCandle>=0&&hoverCandle<chartPositions.length){const it=chartPositions[hoverCandle];ctx.save();ctx.setLineDash([3,4]);ctx.strokeStyle='#aaaab080';ctx.beginPath();ctx.moveTo(it.x,top);ctx.lineTo(it.x,h-bottom);ctx.moveTo(left,priceY(it.c.c));ctx.lineTo(w-right,priceY(it.c.c));ctx.stroke();ctx.restore()}
 }
+
+function inspectChartKeyboard(event){
+ if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+ if(!chartPositions.length)return;
+ event.preventDefault();
+ const total=chartPositions.length;
+ hoverCandle=event.key==='Home'?0:event.key==='End'?total-1:Math.max(0,Math.min(total-1,(hoverCandle<0?total-1:hoverCandle)+(event.key==='ArrowLeft'?-1:1)));
+ const datum=chartPositions[hoverCandle];
+ const details=formatSimTime(datum.c.t)+' UTC, открытие '+num(datum.c.o)+', максимум '+num(datum.c.h)+', минимум '+num(datum.c.l)+', закрытие '+num(datum.c.c);
+ $('priceChart').setAttribute('aria-label','Свеча '+(hoverCandle+1)+' из '+total+': '+details);
+ const tooltip=$('chartTooltip');tooltip.hidden=false;tooltip.textContent=details;
+ tooltip.style.left=Math.min(Math.max(4,datum.x+8),Math.max(4,$('priceChart').clientWidth-220))+'px';tooltip.style.top='8px';
+ renderChart();
+}
+
 function chartHover(e){const c=$('priceChart'),r=c.getBoundingClientRect(),w=r.width,plot=w-8-(w>500?65:55),data=chartPositions;if(!data.length)return;const x=e.clientX-r.left,idx=Math.round((x-8)/(plot/data.length)-.5);hoverCandle=Math.max(0,Math.min(idx,data.length-1));const entry=data[hoverCandle].c,tooltip=$('chartTooltip');tooltip.hidden=false;tooltip.textContent=`${formatSimTime(entry.t)} UTC · О ${num(entry.o)}  М ${num(entry.h)}  Н ${num(entry.l)}  З ${num(entry.c)}`;tooltip.style.left=Math.min(Math.max(4,x+10),Math.max(4,w-220))+'px';tooltip.style.top=Math.max(5,(e.clientY-r.top)-37)+'px';renderChart()}
 
 function exportCSV(){const rows=['Время;Тип;Событие;Описание;Сумма',...state.logs.map(x=>[x.time,x.kind,x.title,x.desc,x.amount??''].map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';'))];const url=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='market-lab-history.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -382,7 +397,7 @@ function bind(){
  $('tickOne').onclick=()=>tick(1);$('tickTen').onclick=()=>tick(10);$('autoPlay').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ';$('autoPlay').classList.remove('playing');}else{timer=setInterval(()=>tick(1),1200);$('autoPlay').textContent='Ⅱ ПАУЗА';$('autoPlay').classList.add('playing');}};
  $('timeframes').querySelectorAll('[data-frame]').forEach(b=>b.onclick=()=>{selectedFrame=+b.dataset.frame;$('timeframes').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));renderHeader();renderChart();});
  $('rangeTabs').querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{selectedRange=+b.dataset.range;$('rangeTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));renderChart()});
- $('priceChart').addEventListener('mousemove',chartHover);$('priceChart').addEventListener('mouseleave',()=>{hoverCandle=-1;$('chartTooltip').hidden=true;renderChart()});
+ $('priceChart').addEventListener('mousemove',chartHover);$('priceChart').addEventListener('pointerdown',chartHover);$('priceChart').addEventListener('keydown',inspectChartKeyboard);$('priceChart').addEventListener('mouseleave',()=>{hoverCandle=-1;$('chartTooltip').hidden=true;renderChart()});
  const learn=(i)=>{setView('laboratory');showLesson(i)};$('helpChart').onclick=()=>learn(0);document.querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>learn(+b.dataset.lesson));$('scenarioLesson').onclick=()=>learn(4);
  $('macroRail').onclick=()=>{setView('terminal');$('scenariosPanel').scrollIntoView({behavior:'smooth',block:'nearest'});};$('blotterTabs').querySelectorAll('[data-pane]').forEach(b=>b.onclick=()=>setBlotter(b.dataset.pane));
  $('fullJournalFilters').querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{filterFull=b.dataset.kind;$('fullJournalFilters').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));renderLogs()});
