@@ -2,7 +2,7 @@ import { INSTRUMENTS, snapCandle, snapPrice, cents, dollars, notionalCents, marg
 import {riskSnapshot, executionPrice, validateOpening} from './core/risk.mjs';
 import {DEFAULT_SEED,SIM_EPOCH,STEP_MS,REGIMES,createMarket,createInitialHistory,upgradeHistory,advanceMarket,appendBars,aggregateBars,formatSimTime} from './core/market.mjs';
 import {SKILLS,PRACTICE,createLearningState,ensureLearningState,buildQuestion,gradeQuestion,nextQuestion,recordPractice,learningSummary} from './core/learning.mjs';
-import {LABS,createLabState,ensureLabState,startLab,setLabPrediction,captureLabContext,numericLabContext,submitLabNumber,recordLabEvent,labSummary} from './core/labs.mjs';
+import {LABS,createLabState,ensureLabState,startLab,resumeLab,setLabPrediction,captureLabContext,numericLabContext,submitLabNumber,recordLabEvent,labSummary} from './core/labs.mjs';
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -160,7 +160,8 @@ function close(p,forced=false,batch=false,stress=false){
  state.labs=recordLabEvent(state.labs,'close',{positionId:String(p.id),forced});
  if(!batch){checkMargin();save();render();notify('Позиция закрыта · '+signedMoney(net));}
 }
-function setView(name){if(!['terminal','laboratory','journal'].includes(name))return;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal'){renderGuidedStrip();requestAnimationFrame(renderChart);}if(name==='laboratory')showLesson(activeLesson);window.scrollTo(0,0);}
+function setView(name){if(!['terminal','laboratory','journal'].includes(name))return;
+ if(name!=='terminal'&&timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ';$('autoPlay').classList.remove('playing');}document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal'){renderGuidedStrip();requestAnimationFrame(renderChart);}if(name==='laboratory')showLesson(activeLesson);window.scrollTo(0,0);}
 function setBlotter(name){document.querySelectorAll('#blotterTabs [data-pane]').forEach(x=>x.classList.toggle('active',x.dataset.pane===name));document.querySelectorAll('[data-blotter]').forEach(x=>x.classList.toggle('active',x.dataset.blotter===name));}
 function chooseAsset(key){if(!assets[key])return;state.selected=key;togglePicker(false);save();render();}
 function togglePicker(show){const pop=$('assetPopup');pop.hidden=typeof show==='boolean'?!show:!pop.hidden;if(!pop.hidden){$('marketSearch').focus();renderPicker();}}
@@ -255,6 +256,7 @@ function renderGuidedLab(i){
  }
  if(!rec.started)controls='<div class="lesson-actions"><button class="control-subtle" id="labStart">НАЧАТЬ ЛАБОРАТОРНУЮ</button></div>';
  if(rec.completed)controls='<div class="lesson-actions"><button class="control-subtle" id="labStart">ПОВТОРИТЬ ЭКСПЕРИМЕНТ</button></div>';
+ if(rec.started&&!rec.completed&&state.labs.active!==lab.id)controls='<div class="lesson-actions"><button class="control-subtle" id="labResume">ПРОДОЛЖИТЬ ЗАДАНИЕ</button></div>';
  const feedback=rec.feedback?'<div class="lab-explain">'+escapeHtml(rec.feedback)+'</div>':'';
  const completed=labSummary(state.labs);
  const summary='<p>Лабораторных работ выполнено: '+completed.complete+' / '+completed.total+'. В этой сессии одновременно отслеживается одна активная работа.</p>';
@@ -263,6 +265,7 @@ function renderGuidedLab(i){
  $('lessonBody').appendChild(box);
  const button=box.querySelector('#labStart');
  if(button)button.onclick=()=>{state.labs=startLab(state.labs,lab.id);save();showLesson(i);renderGuidedStrip();};
+ const resume=box.querySelector('#labResume');if(resume)resume.onclick=()=>{state.labs=resumeLab(state.labs,lab.id);save();showLesson(i);};
  const go=box.querySelector('#labGoTerminal');
  if(go)go.onclick=()=>setView('terminal');
  const submit=box.querySelector('#labSubmit');
