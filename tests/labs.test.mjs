@@ -123,3 +123,16 @@ test('Repeating a completed laboratory never erases earned completion',()=>{
  assert.equal(labSummary(s).complete,1);
  assert.deepEqual(ensureLabState(JSON.parse(JSON.stringify(s))),s);
 });
+
+
+test('Paused laboratory can be resumed with its progress intact',async()=>{
+ const {resumeLab}=await import('../core/labs.mjs');
+ let state=startLab(createLabState(),'trade-cycle');
+ state=recordLabEvent(state,'open',{positionId:'first',side:1,symbol:'MNQ'});
+ assert.equal(state.records['trade-cycle'].stage,1);
+ state=startLab(state,'contract');
+ state=resumeLab(state,'trade-cycle');
+ assert.equal(state.active,'trade-cycle');
+ assert.equal(state.records['trade-cycle'].stage,1);
+ assert.equal(state.records['trade-cycle'].positionId,'first');
+});
