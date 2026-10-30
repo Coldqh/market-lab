@@ -53,6 +53,12 @@ export function captureLabContext(input,id,context){
  return next;
 }
 
+export function resumeLab(input,id){
+ if(!allowed.has(id))throw new RangeError('Неизвестная лабораторная работа');
+ const next=ensureLabState(input);
+ if(!next.records[id].started||next.records[id].completed)throw new Error('Эта попытка не требует продолжения');
+ next.active=id;return next;
+}
 export function setLabPrediction(input,id,direction){
  if(!['macro','hedge'].includes(id)||![1,-1].includes(direction))throw new RangeError('Некорректный прогноз');
  const next=ensureLabState(input),r=next.records[id];
