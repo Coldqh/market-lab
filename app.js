@@ -160,7 +160,7 @@ function close(p,forced=false,batch=false,stress=false){
  state.labs=recordLabEvent(state.labs,'close',{positionId:String(p.id),forced});
  if(!batch){checkMargin();save();render();notify('Позиция закрыта · '+signedMoney(net));}
 }
-function setView(name){if(!['terminal','laboratory','journal'].includes(name))return;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal'){renderGuidedStrip();requestAnimationFrame(renderChart());}if(name==='laboratory')showLesson(activeLesson);window.scrollTo(0,0);}
+function setView(name){if(!['terminal','laboratory','journal'].includes(name))return;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal'){renderGuidedStrip();requestAnimationFrame(renderChart);}if(name==='laboratory')showLesson(activeLesson);window.scrollTo(0,0);}
 function setBlotter(name){document.querySelectorAll('#blotterTabs [data-pane]').forEach(x=>x.classList.toggle('active',x.dataset.pane===name));document.querySelectorAll('[data-blotter]').forEach(x=>x.classList.toggle('active',x.dataset.blotter===name));}
 function chooseAsset(key){if(!assets[key])return;state.selected=key;togglePicker(false);save();render();}
 function togglePicker(show){const pop=$('assetPopup');pop.hidden=typeof show==='boolean'?!show:!pop.hidden;if(!pop.hidden){$('marketSearch').focus();renderPicker();}}
