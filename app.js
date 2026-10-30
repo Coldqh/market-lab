@@ -160,7 +160,7 @@ function close(p,forced=false,batch=false,stress=false){
  state.labs=recordLabEvent(state.labs,'close',{positionId:String(p.id),forced});
  if(!batch){checkMargin();save();render();notify('Позиция закрыта · '+signedMoney(net));}
 }
-function setView(name){if(!['terminal','laboratory','journal'].includes(name))return;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal')requestAnimationFrame(renderChart);if(name==='laboratory')showLesson(activeLesson);window.scrollTo(0,0);}
+function setView(name){if(!['terminal','laboratory','journal'].includes(name))return;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal'){renderGuidedStrip();requestAnimationFrame(renderChart());}if(name==='laboratory')showLesson(activeLesson);window.scrollTo(0,0);}
 function setBlotter(name){document.querySelectorAll('#blotterTabs [data-pane]').forEach(x=>x.classList.toggle('active',x.dataset.pane===name));document.querySelectorAll('[data-blotter]').forEach(x=>x.classList.toggle('active',x.dataset.blotter===name));}
 function chooseAsset(key){if(!assets[key])return;state.selected=key;togglePicker(false);save();render();}
 function togglePicker(show){const pop=$('assetPopup');pop.hidden=typeof show==='boolean'?!show:!pop.hidden;if(!pop.hidden){$('marketSearch').focus();renderPicker();}}
@@ -207,34 +207,46 @@ function guidedLabContext(){
  const symbol=state.selected;
  return {symbol,price:last(symbol),quantity:state.qty,side:state.side,position:state.positions.find(p=>p.key===symbol)||null};
 }
+
+function captureIfPossible(input,id,context){
+ if(!['contract','position-pnl','margin'].includes(id))return input;
+ const updated=captureLabContext(input,id,context);
+ if(!input.records[id].snapshot&&updated.records[id].snapshot)saveCapturedLabContext(updated);
+ return updated;
+}
+function saveCapturedLabContext(labs){state.labs=labs;save();}
+
 function renderGuidedLab(i){
- const lab=LABS[i],ctx=guidedLabContext(),rec=state.labs.records[lab.id];
- const title='<header><span>ЛАБОРАТОРНАЯ РАБОТА '+(i+1)+' / 6</span><span>'+(rec.completed?'ВЫПОЛНЕНО':rec.started?'В ПРОЦЕССЕ':'НЕ НАЧАТО')+'</span></header>';
+ const lab=LABS[i],ctx=guidedLabContext();
+ if(state.labs.active===lab.id){state.labs=captureIfPossible(state.labs,lab.id,ctx);}
+ const rec=state.labs.records[lab.id],locked=rec.snapshot||ctx;
+ const title='<header><span>ЛАБОРАТОРНАЯ РАБОТА '+(i+1)+' / 6</span><span>'+(rec.completed||rec.everCompleted?'ВЫПОЛНЕНО':rec.started?(state.labs.active===lab.id?'В ПРОЦЕССЕ':'ОТЛОЖЕНО'):'НЕ НАЧАТО')+'</span></header>';
  let description='<p>'+escapeHtml(lab.goal)+'</p>';
  let controls='';
  if(rec.started&&!rec.completed){
   if(lab.id==='contract'){
-   const asset=assets[ctx.symbol];
-   description+='<p>Инструмент '+ctx.symbol+': минимальный шаг '+num(asset.tickSize,asset.precision)+', множитель '+num(asset.mult,0)+' $ за единицу цены. Сколько долларов стоит один тик одного контракта?</p>';
+   const asset=assets[locked.symbol];
+   description+='<p>Инструмент '+locked.symbol+': минимальный шаг '+num(asset.tickSize,asset.precision)+', множитель '+num(asset.mult,0)+' $ за единицу цены. Сколько долларов стоит один тик одного контракта?</p>';
   }else if(lab.id==='trade-cycle'){
    const step=rec.stage;
    const steps=['Откройте длинную позицию (LONG) в терминале.','Длинная позиция открыта. Нажмите «+ 1 шаг» под графиком.','Рынок сдвинулся. Вручную закройте эту же позицию.'];
    description+='<p><b>Шаг '+(step+1)+' из 3:</b> '+escapeHtml(steps[Math.min(2,step)])+'</p>';
   }else if(lab.id==='position-pnl'){
-   if(ctx.position){
-    const p=ctx.position;
-    description+='<p>Выбрана '+(p.side===1?'длинная':'короткая')+' позиция '+ctx.symbol+' на '+p.qty+' контракт(а). Цена входа '+num(p.entry,assets[ctx.symbol].precision)+', текущая отметка '+num(ctx.price,assets[ctx.symbol].precision)+', множитель '+num(assets[ctx.symbol].mult,0)+'. Рассчитайте валовой P&L в $ без комиссий (может быть отрицательным).</p>';
+   if(locked.position){
+    const p=locked.position;
+    description+='<p>Выбрана '+(p.side===1?'длинная':'короткая')+' позиция '+locked.symbol+' на '+p.qty+' контракт(а). Цена входа '+num(p.entry,assets[locked.symbol].precision)+', зафиксированная отметка '+num(locked.price,assets[locked.symbol].precision)+', множитель '+num(assets[locked.symbol].mult,0)+'. Рассчитайте валовой P&L в $ без комиссий (может быть отрицательным).</p>';
    }else description+='<p>Сначала откройте позицию по выбранному инструменту в терминале, затем вернитесь к заданию.</p>';
   }else if(lab.id==='margin'){
-   const a=assets[ctx.symbol],execution=executionPrice(ctx.symbol,ctx.price,ctx.side);
-   description+='<p>Текущая заявка: '+ctx.quantity+' × '+ctx.symbol+'; расчётная цена исполнения '+num(execution.price,a.precision)+', множитель '+num(a.mult,0)+', учебная ставка маржи '+num(a.margin*100,2)+'%. Сколько долларов потребуется для начального залога (без комиссии)?</p>';
+   const a=assets[locked.symbol],execution=executionPrice(locked.symbol,locked.price,locked.side);
+   description+='<p>Заявка на момент выдачи задачи: '+locked.quantity+' × '+locked.symbol+'; расчётная цена исполнения '+num(execution.price,a.precision)+', множитель '+num(a.mult,0)+', учебная ставка маржи '+num(a.margin*100,2)+'%. Сколько долларов потребуется для начального залога (без комиссии)?</p>';
   }else if(lab.id==='macro'){
    description+='<p>Предскажите направление цены WTI после сценария «ОПЕК+ сокращает добычу». Зафиксируйте прогноз <b>до</b> публикации события, затем запустите именно этот сценарий в терминале. Оценивается проведение эксперимента, а не попадание прогноза.</p>';
   }else if(lab.id==='hedge'){
    description+='<p>Компания добывает нефть и опасается падения цены будущих продаж. Выберите направление хеджа, а затем самостоятельно откройте соответствующую позицию по <b>CL</b>. Это виртуальная торговая операция с маржей и комиссиями.</p>';
   }
   if(['contract','position-pnl','margin'].includes(lab.id)){
-   const available=lab.id!=='position-pnl'||!!ctx.position;
+   const available=lab.id!=='position-pnl'||!!locked.position;
+   description+='<p class="lab-locked-info">Исходные числа зафиксированы. Дальнейшее движение рынка не изменит ответ.</p>';
    controls='<div class="lesson-actions"><input id="labNumber" type="text" inputmode="decimal" autocomplete="off" aria-label="Ответ в долларах" placeholder="Ответ в $" style="width:min(100%,200px);padding:7px 9px;color:#e5e9ee;background:#1b2128;border:1px solid #38434e;border-radius:0" '+(available?'':'disabled')+'><button class="control-subtle" id="labSubmit" '+(available?'':'disabled')+'>ПРОВЕРИТЬ РАСЧЁТ</button></div>';
   }else if(['macro','hedge'].includes(lab.id)){
    controls='<div class="answer-grid"><button class="answer-option '+(rec.prediction===1?'good':'')+'" data-lab-direction="1">ОЖИДАЮ РОСТ / ПОКУПКА</button><button class="answer-option '+(rec.prediction===-1?'good':'')+'" data-lab-direction="-1">ОЖИДАЮ ПАДЕНИЕ / ПРОДАЖА</button></div>';
@@ -250,13 +262,13 @@ function renderGuidedLab(i){
  box.innerHTML=title+'<h3>'+escapeHtml(lab.title)+'</h3>'+description+controls+feedback+summary;
  $('lessonBody').appendChild(box);
  const button=box.querySelector('#labStart');
- if(button)button.onclick=()=>{state.labs=startLab(state.labs,lab.id);save();showLesson(i);};
+ if(button)button.onclick=()=>{state.labs=startLab(state.labs,lab.id);save();showLesson(i);renderGuidedStrip();};
  const go=box.querySelector('#labGoTerminal');
  if(go)go.onclick=()=>setView('terminal');
  const submit=box.querySelector('#labSubmit');
  if(submit)submit.onclick=()=>{
   try{
-   const response=submitLabNumber(state.labs,lab.id,guidedLabContext(),box.querySelector('#labNumber').value);
+   const response=submitLabNumber(state.labs,lab.id,locked,box.querySelector('#labNumber').value);
    state.labs=response.state;save();showLesson(i);
    notify(response.correct?'Расчёт верный. Лабораторная работа завершена.':'Проверь формулу и попробуй ещё раз.');
   }catch(e){notify(e.message);}
@@ -275,7 +287,7 @@ function showLesson(i){
  const topicProgress=skillCount?'Навыки по теме: '+completed.length+'/'+skillCount+'.':'Тема закрепляется практикой в терминале.';
  const milestone=PRACTICE.map(p=>`${state.learning.actions[p.id]>0?'✓':'○'} ${p.title}`).join(' · ');
  $('lessonBody').innerHTML=`<h2>${escapeHtml(l.title)}</h2><p>${escapeHtml(l.intro)}</p><p>${escapeHtml(l.body)}</p><div class="lesson-formula">${escapeHtml(l.formula)}</div><p><b>Пример:</b> ${escapeHtml(l.example)}</p><p><b>Не путай:</b> ${escapeHtml(l.pitfall)}</p><p class="lesson-next"><b>Попробуй:</b> ${escapeHtml(l.next)}</p><p>${escapeHtml(topicProgress)} Действия в терминале: ${progress.practiced}/${progress.practiceTotal}.</p><div class="lesson-actions"><button id="goToTerminal" class="control-subtle">К ТОРГОВЛЕ</button><button id="lessonNext" class="control-subtle">${i===lessons.length-1?'К ЗАДАНИЯМ':'СЛЕДУЮЩАЯ ТЕМА'} →</button></div>`;
- renderGuidedLab(i);
+ renderGuidedLab(i);renderGuidedStrip();
  $('lessonTabs').querySelectorAll('[data-lesson-tab]').forEach(b=>b.onclick=()=>showLesson(+b.dataset.lessonTab));
  $('goToTerminal').onclick=()=>setView('terminal');
  $('lessonNext').onclick=()=>i===lessons.length-1?$('labs').scrollIntoView({behavior:'smooth'}):showLesson(i+1);
@@ -321,7 +333,31 @@ function renderRiskExplanation(){
  area.insertAdjacentHTML('beforeend',extra);
 }
 
-function render(){renderMetrics();renderHeader();renderTicket();renderRiskExplanation();renderPositions();renderScenarios();renderAccounts();renderTrades();renderLogs();renderLabs();requestAnimationFrame(renderChart);}
+
+function renderGuidedStrip(){
+ const box=$('guidedStrip');if(!box)return;
+ const id=state.labs.active,record=id?state.labs.records[id]:null;
+ if(id&&record&&record.started){
+  const index=LABS.findIndex(x=>x.id===id);
+  const instructions={
+   contract:'Рассчитай стоимость тика — открой работу в разделе «Уроки».',
+   'trade-cycle':['Открой LONG по любому инструменту.','Нажми «+15 мин» под графиком.','Вручную закрой ту же позицию.'][Math.min(record.stage,2)],
+   'position-pnl':record.snapshot?'Вычисли прибыль/убыток по зафиксированным данным.':'Открой позицию, затем перейди к уроку для расчёта.',
+   margin:'Рассчитай залог по данным торговой заявки.',
+   macro:record.prediction===null?'Сначала зафиксируй прогноз в уроке.':'Проведи сценарий «ОПЕК+ сокращает добычу».',
+   hedge:record.prediction===-1?'Открой SHORT по CL.':'Сначала выбери правильный хедж в уроке.'
+  };
+  box.hidden=false;
+  box.innerHTML='<div class="guided-strip-copy"><strong>'+(record.completed?'ЛАБОРАТОРНАЯ ВЫПОЛНЕНА':'АКТИВНАЯ ЛАБОРАТОРНАЯ · '+(index+1)+'/6')+'</strong><span>'+escapeHtml(record.completed?'Работа сохранена. Можно изучить следующий модуль.':instructions[id]||LABS[index].goal)+'</span></div><button class="control-subtle" data-guide="resume">'+(record.completed?'К РЕЗУЛЬТАТУ':'К ЗАДАНИЮ')+' →</button>';
+  return;
+ }
+ const beginner=state.ticks===0&&!state.closed&&!state.shocks&&learningSummary(state.learning,state.ticks).attempts===0&&!state.onboardingDismissed;
+ if(!beginner){box.hidden=true;return;}
+ box.hidden=false;
+ box.innerHTML='<div class="guided-strip-copy"><strong>ВПЕРВЫЕ В ТЕРМИНАЛЕ?</strong><span>Начни с короткого урока и первой лабораторной. Свободная практика тоже доступна.</span></div><button class="control-subtle" data-guide="start">НАЧАТЬ ОБУЧЕНИЕ →</button><button class="guide-dismiss" data-guide="dismiss" aria-label="Скрыть подсказку">×</button>';
+}
+
+function render(){renderGuidedStrip();renderMetrics();renderHeader();renderTicket();renderRiskExplanation();renderPositions();renderScenarios();renderAccounts();renderTrades();renderLogs();renderLabs();requestAnimationFrame(renderChart);}
 function renderChart(){const canvas=$('priceChart');if(!canvas || !canvas.getClientRects().length || canvas.clientWidth<10)return;const rect=canvas.getBoundingClientRect(),w=rect.width,h=rect.height,dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);const a=assetDefs[state.selected],all=aggregateBars(state.candles[state.selected],selectedFrame),points=all.slice(-selectedRange),left=8,right=w>500?65:55,top=7,bottom=31,volH=0,mainBottom=h-volH-bottom,plotWidth=w-left-right;const allHigh=Math.max(...points.map(c=>c.h)),allLow=Math.min(...points.map(c=>c.l)),pad=Math.max((allHigh-allLow)*.24,allLow*.001);const hi=allHigh+pad,lo=allLow-pad,priceY=p=>top+(hi-p)/(hi-lo)*(mainBottom-top);const colorUp='#52b39b',colorDn='#d66273';chartPositions=[];
  ctx.font='10px Arial, sans-serif';ctx.textBaseline='middle';for(let j=0;j<=4;j++){const yp=top+(mainBottom-top)*j/4;ctx.beginPath();ctx.moveTo(left,yp);ctx.lineTo(w-right+7,yp);ctx.strokeStyle='#4a536044';ctx.lineWidth=.7;ctx.stroke();ctx.fillStyle='#bac6d2';ctx.fillText(num(hi-(hi-lo)*j/4,a.precision),w-right+13,yp)}for(let j=0;j<=7;j++){const xp=left+(plotWidth*j/7);ctx.beginPath();ctx.moveTo(xp,top);ctx.lineTo(xp,h-bottom);ctx.strokeStyle='#3c485038';ctx.stroke();}
  const unit=plotWidth/Math.max(points.length,1),barW=Math.min(Math.max(unit*.62,2),11),maxVol=Math.max(...points.map(c=>c.v),1);
@@ -342,6 +378,7 @@ function bind(){
  for(const id of ['symbolPicker','assetSelector','assetPickerRail'])$(id).onclick=()=>{if(id==='assetPickerRail')setView('terminal');togglePicker(true)};
  $('assetPopupClose').onclick=()=>togglePicker(false);$('marketSearch').oninput=renderPicker;document.addEventListener('pointerdown',e=>{if(!$('assetPopup').hidden&&!e.target.closest('#assetPopup')&&!e.target.closest('#symbolPicker')&&!e.target.closest('#assetSelector')&&!e.target.closest('#assetPickerRail'))togglePicker(false)});
  $('longButton').onclick=()=>{state.side=1;save();renderTicket()};$('shortButton').onclick=()=>{state.side=-1;save();renderTicket()};$('qtyDown').onclick=()=>{state.qty=Math.max(1,state.qty-1);save();renderTicket()};$('qtyUp').onclick=()=>{state.qty=Math.min(20,state.qty+1);save();renderTicket()};$('placeOrder').onclick=()=>open(state.side);$('closeSelected').onclick=()=>{const p=state.positions.find(x=>x.key===state.selected);if(p)close(p)};
+ $('guidedStrip').onclick=e=>{const action=e.target.closest('[data-guide]')?.dataset.guide;if(action==='resume'){const i=LABS.findIndex(l=>l.id===state.labs.active);setView('laboratory');showLesson(Math.max(i,0));}else if(action==='start'){setView('laboratory');showLesson(0);}else if(action==='dismiss'){state.onboardingDismissed=true;save();renderGuidedStrip();}};
  $('tickOne').onclick=()=>tick(1);$('tickTen').onclick=()=>tick(10);$('autoPlay').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ';$('autoPlay').classList.remove('playing');}else{timer=setInterval(()=>tick(1),1200);$('autoPlay').textContent='Ⅱ ПАУЗА';$('autoPlay').classList.add('playing');}};
  $('timeframes').querySelectorAll('[data-frame]').forEach(b=>b.onclick=()=>{selectedFrame=+b.dataset.frame;$('timeframes').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));renderHeader();renderChart();});
  $('rangeTabs').querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{selectedRange=+b.dataset.range;$('rangeTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));renderChart()});
