@@ -88,7 +88,7 @@ test('Reload normalization and experiment reset are safe',()=>{
  assert.deepEqual(ensureLabState(JSON.parse(JSON.stringify(s))),s);
  assert.equal(labSummary(s).complete,1);
  s=startLab(s,'contract');
- assert.equal(labSummary(s).complete,0);
+ assert.equal(labSummary(s).complete,1); // earned completion persists while the new attempt is active
  assert.equal(s.records.contract.attempts,0);
  const bad=ensureLabState({version:1,active:'__proto__',records:{contract:{started:true,stage:999,feedback:'a'}}});
  assert.equal(bad.active,null);
