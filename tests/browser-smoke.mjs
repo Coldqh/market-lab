@@ -54,7 +54,7 @@ try{
   await p.locator('[data-view="laboratory"]').click();
   await p.locator('[data-lesson-tab="2"]').click();
   await p.locator('#labStart').click();
-  await p.locator('[data-guide="resume"]').click();
+  await p.locator('#labGoTerminal').click();
   await p.locator('#placeOrder').click();
   await p.locator('[data-guide="resume"]').click();
   let state=await p.evaluate(()=>JSON.parse(localStorage.getItem('marketlab-education-workstation-v8')));
