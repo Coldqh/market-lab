@@ -81,6 +81,9 @@ try{
   p.on('pageerror',e=>errors.push(e.message));
   await p.goto(url,{waitUntil:'networkidle'});
   assert.notEqual(await p.locator('#equity').textContent(),'—');
+  await p.locator('#priceChart').focus();
+  await p.keyboard.press('ArrowLeft');
+  assert.match(await p.locator('#priceChart').getAttribute('aria-label'),/Свеча/);
   await p.locator('#orderDetails summary').click();
   assert.equal(await p.locator('#notional').isVisible(),true);
   await p.locator('#placeOrder').click();
