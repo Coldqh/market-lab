@@ -88,10 +88,51 @@ test('Reload normalization and experiment reset are safe',()=>{
  assert.deepEqual(ensureLabState(JSON.parse(JSON.stringify(s))),s);
  assert.equal(labSummary(s).complete,1);
  s=startLab(s,'contract');
- assert.equal(labSummary(s).complete,0);
+ assert.equal(labSummary(s).complete,1); // earned completion persists while the new attempt is active
  assert.equal(s.records.contract.attempts,0);
  const bad=ensureLabState({version:1,active:'__proto__',records:{contract:{started:true,stage:999,feedback:'a'}}});
  assert.equal(bad.active,null);
  assert.equal(bad.records.contract.stage,0);
  assert.throws(()=>submitLabNumber(startLab(createLabState(),'margin'),'margin',{symbol:'MNQ',price:25000,quantity:1,side:1},'abc'),RangeError);
+});
+
+
+test('Numeric laboratory keeps a frozen market snapshot even after price and ticket change',async()=>{
+ const {captureLabContext}=await import('../core/labs.mjs');
+ let s=startLab(createLabState(),'position-pnl');
+ const context={symbol:'MNQ',price:20010,quantity:2,side:1,position:{key:'MNQ',entry:20000,qty:2,side:1}};
+ s=captureLabContext(s,'position-pnl',context);
+ assert.equal(s.records['position-pnl'].snapshot.price,20010);
+ s=captureLabContext(s,'position-pnl',{...context,price:19000});
+ assert.equal(s.records['position-pnl'].snapshot.price,20010);
+ const graded=submitLabNumber(s,'position-pnl',{...context,price:19000},40);
+ assert.equal(graded.correct,true);
+ assert.equal(graded.expected,40);
+});
+test('Repeating a completed laboratory never erases earned completion',()=>{
+ let s=startLab(createLabState(),'contract');
+ s=submitLabNumber(s,'contract',{symbol:'MNQ'},.5).state;
+ assert.equal(labSummary(s).complete,1);
+ s=startLab(s,'contract');
+ assert.equal(labSummary(s).complete,1);
+ assert.equal(s.records.contract.completed,false);
+ assert.equal(s.records.contract.everCompleted,true);
+ assert.equal(s.records.contract.completions,1);
+ s=submitLabNumber(s,'contract',{symbol:'GC'},10).state;
+ assert.equal(s.records.contract.completions,2);
+ assert.equal(labSummary(s).complete,1);
+ assert.deepEqual(ensureLabState(JSON.parse(JSON.stringify(s))),s);
+});
+
+
+test('Paused laboratory can be resumed with its progress intact',async()=>{
+ const {resumeLab}=await import('../core/labs.mjs');
+ let state=startLab(createLabState(),'trade-cycle');
+ state=recordLabEvent(state,'open',{positionId:'first',side:1,symbol:'MNQ'});
+ assert.equal(state.records['trade-cycle'].stage,1);
+ state=startLab(state,'contract');
+ state=resumeLab(state,'trade-cycle');
+ assert.equal(state.active,'trade-cycle');
+ assert.equal(state.records['trade-cycle'].stage,1);
+ assert.equal(state.records['trade-cycle'].positionId,'first');
 });

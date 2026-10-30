@@ -124,3 +124,28 @@ html,body,.app-shell{background:var(--bg)}
 .trade-action-footer [hidden]{display:none!important}
 @media(max-width:760px){.rail-button{width:39px;height:47px}.rail-glyph{font-size:19px;line-height:22px}.rail-label{font-size:7px;letter-spacing:0}.top-metric{font-size:10px}.top-metric b{font-size:10px}}
 @media(max-width:480px){.order-stack{grid-template-rows:495px 210px;height:709px;min-height:709px}.order-pane{height:495px}.order-content{padding:8px}.order-bottom-facts{font-size:10.5px}.trade-action-footer{padding:7px}}
+
+
+/* UX 1.5.1: contextual learning inside the original rectangular terminal. */
+.guided-strip{background:#18232a;border-bottom:1px solid #3a515d;color:#e0e8ef;padding:7px 9px;display:flex;gap:10px;align-items:center;justify-content:space-between;min-height:42px}
+.guided-strip[hidden]{display:none!important}
+.guided-strip-copy{display:flex;flex:1;align-items:center;gap:11px;min-width:0}
+.guided-strip-copy strong{font-size:10px;color:#9fcee2;white-space:nowrap}
+.guided-strip-copy span{font-size:11px;color:#d3dee8;overflow-wrap:anywhere}
+.guided-strip .control-subtle{flex:none;height:29px}
+.guide-dismiss{border:0;background:transparent;color:#b5beca;min-width:24px;min-height:29px;font-size:17px}
+.order-details{margin-top:8px;padding:5px 0 0;border-top:1px solid #35404b}
+.order-details summary{cursor:pointer;color:#b8ccdd;font-size:11px;padding:5px 2px;list-style:revert}
+.order-details[open] summary{color:#e2eaf0}
+.order-details-body{padding:4px 2px 5px}
+.order-details-body>div{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:4px 0;font-size:10.5px}
+.order-details-body b{font-weight:500;color:#e4edf5;overflow-wrap:anywhere}
+.order-details-body p{font-size:10.5px;color:#aab6c3;margin:7px 0 0;line-height:1.5}
+.lab-locked-info{color:#bdd1df!important;border-left:2px solid #597c8c;background:#18252e;padding:6px 9px;margin:8px 0}
+.scenario-result{border-left:2px solid #638f82;padding:6px 8px;background:#162520;color:#bfe2d0!important}
+.scenario-preview{color:#aabac7!important}
+#priceChart:focus-visible{outline:2px solid #92afc4;outline-offset:-2px}
+#priceChart{touch-action:pan-y}
+@media(max-width:1120px){.guided-strip-copy{align-items:flex-start;flex-direction:column;gap:3px}}
+@media(max-width:760px){.guided-strip{padding:6px;gap:6px}.guided-strip-copy strong{font-size:9px}.guided-strip-copy span{font-size:10px}.guided-strip .control-subtle{font-size:9px;white-space:normal}.order-details summary{min-height:30px}}
+@media(max-width:480px){.guided-strip{min-height:54px}.chart-footer .control-subtle{padding:5px 3px;font-size:9px}.order-details-body>div{font-size:10px}}
