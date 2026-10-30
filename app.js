@@ -2,7 +2,7 @@ import { INSTRUMENTS, snapCandle, snapPrice, cents, dollars, notionalCents, marg
 import {riskSnapshot, executionPrice, validateOpening} from './core/risk.mjs';
 import {DEFAULT_SEED,SIM_EPOCH,STEP_MS,REGIMES,createMarket,createInitialHistory,upgradeHistory,advanceMarket,appendBars,aggregateBars,formatSimTime} from './core/market.mjs';
 import {SKILLS,PRACTICE,createLearningState,ensureLearningState,buildQuestion,gradeQuestion,nextQuestion,recordPractice,learningSummary} from './core/learning.mjs';
-import {LABS,createLabState,ensureLabState,startLab,setLabPrediction,numericLabContext,submitLabNumber,recordLabEvent,labSummary} from './core/labs.mjs';
+import {LABS,createLabState,ensureLabState,startLab,setLabPrediction,captureLabContext,numericLabContext,submitLabNumber,recordLabEvent,labSummary} from './core/labs.mjs';
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -42,7 +42,7 @@ function init(){
  state={cash:START,selected:'MNQ',side:1,qty:1,positions:[],trades:[],logs:[],
   candles:initial.candles,market:initial.market,simTimeMs:initial.simTimeMs,
   realized:0,fees:0,wins:0,closed:0,shocks:0,ticks:0,answered:{},marginStatus:'safe',
-  version:8,learning:createLearningState(DEFAULT_SEED),labs:createLabState(),ledger:[{id:'opening',kind:'opening',amountCents:cents(START),ref:'session'}]};
+  version:8,learning:createLearningState(DEFAULT_SEED),labs:createLabState(),onboardingDismissed:false,lastScenarioResult:null,ledger:[{id:'opening',kind:'opening',amountCents:cents(START),ref:'session'}]};
  addLog('INFO','Сессия создана','Котировки и часы синтетические; seed '+DEFAULT_SEED+'.');
  save();
 }
@@ -68,6 +68,8 @@ function load(){
   if(!Number.isSafeInteger(d.market.rng)||!Number.isSafeInteger(d.market.step)||d.market.step<0||d.simTimeMs%STEP_MS!==0)return false;
   d.learning=ensureLearningState(d.learning,d.answered);
   d.labs=ensureLabState(d.labs);
+  d.onboardingDismissed=d.onboardingDismissed===true;
+  if(!d.lastScenarioResult||typeof d.lastScenarioResult!=='object')d.lastScenarioResult=null;
   d.version=8;
   state=d;rng=Number.isSafeInteger(d.rng)?d.rng:DEFAULT_SEED;
   state.cash=dollars(ledgerBalanceCents(d.ledger));
@@ -105,6 +107,7 @@ function scenarioRun(i){
  tick(1,ev.moves);state.shocks++;state.learning=recordPractice(state.learning,'scenario',String(state.shocks));
  state.labs=recordLabEvent(state.labs,'scenario',{index:i,before:before.CL,after:last('CL')});
  const actual=Object.keys(assets).map(k=>k+': '+pct((last(k)/before[k]-1)*100)).join('; ');
+ state.lastScenarioResult={index:i,tick:state.ticks,actual,why:ev.why};
  addLog('EVENT',ev.title,'Фактическая реакция учебной модели: '+actual+'. '+ev.why);
  save();render();notify('Сценарий применён: '+ev.title);
 }
@@ -175,7 +178,25 @@ $('riskHint').textContent=pos?'Позиция открыта. Результат
 'Учебное исполнение по '+num(fill.price,a.precision)+' (котировка '+num(price,a.precision)+', разница 1 тик). Залог не ограничивает убыток.'+warning;
  $('tradeExplainer').innerHTML=pos?`<div class="explain-row"><span>Открытая позиция</span><b>${pos.side===1?'Покупка':'Продажа'} · ${pos.qty} шт.</b></div><div class="explain-row"><span>Цена входа</span><b>${num(pos.entry,a.precision)}</b></div><div class="explain-row"><span>Текущая цена</span><b>${num(price,a.precision)}</b></div><div class="explain-row"><span>Результат до закрытия</span><b class="${positionPnl(pos)>=0?'up':'down'}">${signedMoney(positionPnl(pos))}</b></div><p>(${num(price,a.precision)} − ${num(pos.entry,a.precision)}) × ${a.mult} × ${pos.qty} × ${pos.side===1?'1':'−1'} = ${signedMoney(positionPnl(pos))}. Комиссия и учебное проскальзывание при закрытии ещё не учтены.</p>`:`<p>Ты выбираешь <b>${state.side===1?'рост':'падение'}</b> цены. Сумма результата зависит от числа контрактов.</p><div class="explain-row"><span>Если угадаешь направление на 1%</span><b class="up">+${money(n*.01)}</b></div><div class="explain-row"><span>Если ошибёшься на 1%</span><b class="down">−${money(n*.01)}</b></div><p>Открой позицию и нажми «+ 1 шаг» под графиком. Комиссии уменьшат результат.</p>`;}
 function renderPositions(){const ps=state.positions;$('positionCount').textContent=`${ps.length} ${ps.length===1?'позиция':'позиций'}`;$('positions').innerHTML=ps.length?ps.map(p=>`<tr><td>${p.key} · ${assets[p.key].name}</td><td class="${p.side===1?'up':'down'}">${p.side===1?'Покупка':'Продажа'}</td><td>${p.qty}</td><td>${num(p.entry,assets[p.key].precision)}</td><td>${num(last(p.key),assets[p.key].precision)}</td><td class="${positionPnl(p)>=0?'up':'down'}">${signedMoney(positionPnl(p))}</td><td><button class="row-close" data-close="${p.id}">Закрыть</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty-cell">Открытых позиций нет. Выберите инструмент и направление справа.</td></tr>';$('positions').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const p=state.positions.find(p=>String(p.id)===b.dataset.close);if(p)close(p);});}
-function renderScenarios(){$('scenarios').innerHTML=scenarios.map((ev,i)=>`<div class="scenario-row"><div class="scenario-head"><span class="event-icon">${ev.icon}</span><strong>${ev.title}</strong></div><p>${ev.effect}</p><div class="scenario-impact">${Object.entries(ev.moves).map(([k,d])=>`<span class="${d>=0?'up':'down'}">${k} ${pct(d*100)}</span>`).join('')}</div><button data-scenario="${i}" class="scenario-apply">ЗАПУСТИТЬ СЦЕНАРИЙ</button><details class="scenario-why"><summary>Почему так?</summary><p>${ev.why}</p></details></div>`).join('');$('scenarios').querySelectorAll('[data-scenario]').forEach(b=>b.onclick=()=>scenarioRun(+b.dataset.scenario));$('scenarioDetails').textContent=`Учебный импульс задаётся заранее, но итог включает рыночный шум. Последнее событие: ${state.logs.find(x=>x.kind==='EVENT')?.title||'ещё не было'}.`}
+function renderScenarios(){
+ const open=new Set([...$('scenarios').querySelectorAll('details[open][data-scenario-detail]')].map(x=>x.dataset.scenarioDetail));
+ const neutral=[
+  'Решение ФРС о ставке. Как отреагируют индекс, нефть и золото?',
+  'Поставщики нефти меняют объём добычи. Что произойдёт с WTI?',
+  'Опубликованы новые данные об инфляции. Какие ожидания изменятся?',
+  'Возникают проблемы в банковской системе. Что может произойти с капиталом?',
+  'Экономическая активность ускоряется. Как изменится спрос на активы?'
+ ];
+ const latest=state.lastScenarioResult;
+ $('scenarios').innerHTML=scenarios.map((ev,i)=>{
+  const done=latest&&latest.index===i;
+  const after=done?'<p class="scenario-result">Последний эксперимент: '+escapeHtml(latest.actual)+'</p><details class="scenario-why" data-scenario-detail="'+i+'"><summary>Почему так произошло?</summary><p>'+escapeHtml(ev.why)+'</p></details>':'<p class="scenario-preview">Выбери направление заранее, затем сравни с реальным исходом учебной модели.</p>';
+  return '<div class="scenario-row"><div class="scenario-head"><span class="event-icon">'+ev.icon+'</span><strong>'+escapeHtml(ev.title)+'</strong></div><p>'+escapeHtml(neutral[i])+'</p>'+after+'<button data-scenario="'+i+'" class="scenario-apply">ПРОВЕСТИ ЭКСПЕРИМЕНТ</button></div>';
+ }).join('');
+ $('scenarios').querySelectorAll('[data-scenario]').forEach(b=>b.onclick=()=>scenarioRun(+b.dataset.scenario));
+ $('scenarios').querySelectorAll('[data-scenario-detail]').forEach(d=>{if(open.has(d.dataset.scenarioDetail))d.open=true;});
+ $('scenarioDetails').textContent=latest?'Результат последнего опыта: '+latest.actual+'. Это синтетические цены, не прогноз.':'Проценты и направление движения раскрываются только после эксперимента.';
+}
 function renderAccounts(){$('accountData').innerHTML=[['Начальный капитал',money(START)],['Доступные средства',money(freeMargin())],['Текущий капитал',money(equity())],['Открытых позиций',state.positions.length],['Комиссии',money(state.fees)]].map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');}
 function renderTrades(){$('tradesRows').innerHTML=state.trades.length?state.trades.slice(0,30).map(t=>`<tr><td>${escapeHtml(t.time)}</td><td>${t.key}</td><td>${t.qty}</td><td>${t.side===1?'Покупка':'Продажа'}</td><td>${num(t.entry,assets[t.key].precision)}</td><td>${num(t.exit,assets[t.key].precision)}</td><td class="${t.net>=0?'up':'down'}">${signedMoney(t.net)}</td></tr>`).join(''):'<tr><td colspan="7" class="empty-cell">Закрытые сделки появятся здесь.</td></tr>';}
 function filteredLogs(){return state.logs.filter(x=>filterFull==='ALL'||x.kind===filterFull)}
@@ -283,6 +304,23 @@ function renderLabs(){
  });
  const toTerminal=$('labs').querySelector('[data-learning-terminal]');if(toTerminal)toTerminal.onclick=()=>setView('terminal');
 }
+
+function renderRiskExplanation(){
+ const area=$('tradeExplainer'),key=state.selected,a=assets[key],mark=last(key);
+ const p=state.positions.find(x=>x.key===key);
+ const fill=executionPrice(key,mark,p?-p.side:state.side);
+ const risk=riskSnapshot(cents(equity()),cents(usedMargin()));
+ const status={safe:'норма',warning:'предупреждение',margin_call:'дефицит маржи',liquidate:'принудительное закрытие'}[risk.level];
+ let extra='<div class="explain-row"><span>'+(p?'Оценка цены закрытия':'Цена учебного исполнения')+'</span><b>'+num(fill.price,a.precision)+'</b></div>';
+ if(p){
+  const gross=grossPnlCents(key,p.entry,fill.price,p.qty,p.side);
+  const net=dollars(gross-cents(p.openFee??fee(key,p.qty,p.entry))-feeCents(key,fill.price,p.qty));
+  extra+='<div class="explain-row"><span>Если закрыть сейчас, чистый итог</span><b class="'+(net>=0?'up':'down')+'">'+signedMoney(net)+'</b></div>';
+ }
+ if(state.positions.length)extra+='<div class="explain-row"><span>Запас до ликвидации · '+status+'</span><b>'+money(dollars(risk.cushionCents))+'</b></div>';
+ area.insertAdjacentHTML('beforeend',extra);
+}
+
 function render(){renderMetrics();renderHeader();renderTicket();renderRiskExplanation();renderPositions();renderScenarios();renderAccounts();renderTrades();renderLogs();renderLabs();requestAnimationFrame(renderChart);}
 function renderChart(){const canvas=$('priceChart');if(!canvas || !canvas.getClientRects().length || canvas.clientWidth<10)return;const rect=canvas.getBoundingClientRect(),w=rect.width,h=rect.height,dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);const a=assetDefs[state.selected],all=aggregateBars(state.candles[state.selected],selectedFrame),points=all.slice(-selectedRange),left=8,right=w>500?65:55,top=7,bottom=31,volH=0,mainBottom=h-volH-bottom,plotWidth=w-left-right;const allHigh=Math.max(...points.map(c=>c.h)),allLow=Math.min(...points.map(c=>c.l)),pad=Math.max((allHigh-allLow)*.24,allLow*.001);const hi=allHigh+pad,lo=allLow-pad,priceY=p=>top+(hi-p)/(hi-lo)*(mainBottom-top);const colorUp='#52b39b',colorDn='#d66273';chartPositions=[];
  ctx.font='10px Arial, sans-serif';ctx.textBaseline='middle';for(let j=0;j<=4;j++){const yp=top+(mainBottom-top)*j/4;ctx.beginPath();ctx.moveTo(left,yp);ctx.lineTo(w-right+7,yp);ctx.strokeStyle='#4a536044';ctx.lineWidth=.7;ctx.stroke();ctx.fillStyle='#bac6d2';ctx.fillText(num(hi-(hi-lo)*j/4,a.precision),w-right+13,yp)}for(let j=0;j<=7;j++){const xp=left+(plotWidth*j/7);ctx.beginPath();ctx.moveTo(xp,top);ctx.lineTo(xp,h-bottom);ctx.strokeStyle='#3c485038';ctx.stroke();}
