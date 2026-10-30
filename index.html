@@ -13,7 +13,7 @@
 <div class="app-shell">
  <header class="global-header">
   <a class="brand" id="brandLink" href="#terminal" aria-label="Лаборатория рынка"><svg viewBox="0 0 48 44" width="40" height="37" aria-hidden="true"><path d="M5 33 17 11 28 24 43 4" fill="none" stroke="#d8ae43" stroke-width="3"/><path d="M4 17 15 30 26 9 38 20" fill="none" stroke="#bbc6d6" stroke-width="3"/></svg></a>
-  <span class="account-select static-account">УЧЕБНЫЙ СЧЁТ <span>50 000 $</span></span>
+  <span class="account-select static-account" title="Начальный виртуальный капитал. Текущий капитал и доступные средства находятся справа.">СТАРТ <span>50 000 $</span></span>
   <div class="account-metrics" aria-label="Сводка счёта">
    <div class="top-metric"><span>НА СЧЁТЕ:</span> <b id="equity">—</b></div>
    <div class="top-metric"><span>ДОСТУПНО:</span> <b id="freeMargin">—</b></div>
@@ -40,6 +40,7 @@
    <div class="terminal-grid">
     <section class="pane chart-pane">
      <div class="pane-tabs"><span class="pane-tab active">График · движение цены</span><span class="pane-fill"></span><span class="pane-meta">УЧЕБНЫЕ КОТИРОВКИ</span></div>
+     <div class="guided-strip" id="guidedStrip" hidden aria-live="polite"></div>
      <div class="chart-toolbar">
       <button class="symbol-search" id="symbolPicker"><span>⌕</span> <b id="symbolTicker">MNQ</b><small>▾</small></button>
       <div class="toolbar-divider"></div>
@@ -52,9 +53,9 @@
      <div class="quote-strip"><strong id="chartFullSymbol">MNQ · 15 мин</strong><span class="status-dot">●</span><span id="ohlc">—</span><span id="priceChange">—</span></div>
      <div class="chart-stage">
       <div class="drawing-rail learning-rail" aria-label="Подсказки к графику"><button data-lesson="0" title="Что такое фьючерс">①</button><button data-lesson="1" title="Что такое длинная и короткая позиция">②</button><button data-lesson="2" title="Как считается результат">③</button><button data-lesson="3" title="Что такое маржа">④</button><span></span><button data-lesson="4" title="Влияние экономических событий">⑤</button></div>
-      <div class="chart-canvas-wrap"><div class="chart-watermark" aria-hidden="true"><strong id="watermarkTicker">MNQ</strong><span id="watermarkContract">ФЬЮЧЕРС</span></div><canvas id="priceChart" role="img" aria-label="Учебный свечной график"></canvas><div class="chart-crosshair" id="chartTooltip" hidden></div><div class="chart-last-overlay" id="lastPrice" hidden></div><div class="chart-floating-tools" id="autoIndicator">УЧЕБНЫЙ РЫНОК</div></div>
+      <div class="chart-canvas-wrap"><div class="chart-watermark" aria-hidden="true"><strong id="watermarkTicker">MNQ</strong><span id="watermarkContract">ФЬЮЧЕРС</span></div><canvas id="priceChart" role="img" tabindex="0" aria-label="Учебный свечной график. Выбирайте свечи стрелками влево и вправо."></canvas><div class="chart-crosshair" id="chartTooltip" hidden></div><div class="chart-last-overlay" id="lastPrice" hidden></div><div class="chart-floating-tools" id="autoIndicator">УЧЕБНЫЙ РЫНОК</div></div>
      </div>
-     <div class="chart-footer"><div class="range-tabs" id="rangeTabs"><button data-range="32">32 свечи</button><button data-range="64" class="active">64 свечи</button><button data-range="128">Все</button></div><span class="chart-spacer"></span><button class="control-subtle" id="tickOne" title="Продвинуть учебный рынок на один шаг">+ 1 ШАГ</button><button class="control-subtle" id="tickTen" title="Продвинуть рынок на десять шагов">+ 10 ШАГОВ</button><button class="control-subtle" id="autoPlay" title="Автоматически двигать цену">▶ ЗАПУСТИТЬ</button><span class="chart-clock" id="timeNow">—</span></div>
+     <div class="chart-footer"><div class="range-tabs" id="rangeTabs"><button data-range="32">32 свечи</button><button data-range="64" class="active">64 свечи</button><button data-range="128">Все</button></div><span class="chart-spacer"></span><button class="control-subtle" id="tickOne" title="Продвинуть синтетический рынок на 15 минут">+15 МИН</button><button class="control-subtle" id="tickTen" title="Продвинуть синтетический рынок на 2 часа 30 минут">+2 Ч 30 МИН</button><button class="control-subtle" id="autoPlay" title="Автоматически двигать цену">▶ ЗАПУСТИТЬ</button><span class="chart-clock" id="timeNow">—</span></div>
      <div class="asset-popup" id="assetPopup" hidden><div class="asset-popup-title">ВЫБОР ФЬЮЧЕРСА <button id="assetPopupClose" title="Закрыть">×</button></div><input id="marketSearch" type="search" placeholder="Название или код..." autocomplete="off" aria-label="Поиск фьючерса"><div class="market-list" id="marketList"></div></div>
     </section>
     <section class="order-stack">
@@ -67,7 +68,21 @@
        <div class="form-help" id="directionHelp">Покупка приносит прибыль при росте цены.</div>
        <label class="form-label step-label">3. Сколько контрактов?</label>
        <div class="qty-line"><button id="qtyDown" aria-label="Уменьшить количество">−</button><output id="quantity">1</output><button id="qtyUp" aria-label="Увеличить количество">+</button></div>
-       <div class="order-bottom-facts extended-facts"><div>Цена контракта <b id="marketPrice">—</b></div><div>Множитель <b id="multiplier">—</b></div><div>Общий размер сделки <b id="notional">—</b></div><div class="key-fact">Нужно для открытия <b id="initialMargin">—</b></div><div>Комиссия при открытии <b id="fee">—</b></div><div>Останется доступно <b id="afterMargin">—</b></div><div class="loss-fact">Если цена пойдёт против на 1% <b id="onePercent">—</b></div></div>
+       <div class="order-bottom-facts extended-facts">
+        <div class="key-fact">Нужно для открытия <b id="initialMargin">—</b></div>
+        <div class="loss-fact">Если цена пойдёт против на 1% <b id="onePercent">—</b></div>
+        <div>После открытия доступно <b id="afterMargin">—</b></div>
+        <details class="order-details" id="orderDetails">
+         <summary>Подробный расчёт сделки</summary>
+         <div class="order-details-body">
+          <div>Текущая цена <b id="marketPrice">—</b></div>
+          <div>Множитель контракта <b id="multiplier">—</b></div>
+          <div>Номинал всей позиции <b id="notional">—</b></div>
+          <div>Комиссия открытия <b id="fee">—</b></div>
+          <p>Номинал определяет размер риска, а маржа — сумму обеспечения. Убыток не ограничен маржой.</p>
+         </div>
+        </details>
+       </div>
        <div class="risk-hint" id="riskHint">Обеспечение — залог, а не предел убытка.</div>
       </div>
       <div class="trade-action-footer">
