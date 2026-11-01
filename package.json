@@ -1,11 +1,11 @@
 {
   "name": "market-lab",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check app.js && node --check core/finance.mjs && node --check core/risk.mjs && node --check core/market.mjs && node --check core/learning.mjs && node --check core/labs.mjs && npm test",
+    "check": "node --check app.js && node --check core/finance.mjs && node --check core/risk.mjs && node --check core/market.mjs && node --check core/learning.mjs && node --check core/labs.mjs && node --check core/ux.mjs && npm test",
     "smoke": "node tests/browser-smoke.mjs"
   },
   "engines": {
