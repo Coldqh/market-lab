@@ -3,6 +3,7 @@ import {riskSnapshot, executionPrice, validateOpening} from './core/risk.mjs';
 import {DEFAULT_SEED,SIM_EPOCH,STEP_MS,REGIMES,createMarket,createInitialHistory,upgradeHistory,advanceMarket,appendBars,aggregateBars,formatSimTime} from './core/market.mjs';
 import {SKILLS,PRACTICE,createLearningState,ensureLearningState,buildQuestion,gradeQuestion,nextQuestion,recordPractice,learningSummary} from './core/learning.mjs';
 import {LABS,createLabState,ensureLabState,startLab,resumeLab,setLabPrediction,captureLabContext,numericLabContext,submitLabNumber,recordLabEvent,labSummary} from './core/labs.mjs';
+import {curriculumSummary,tradeBreakdown} from './core/ux.mjs';
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -34,7 +35,7 @@ const lessons=[
  {title:'Новости и экономика',intro:'Ставки, инфляция, энергетический баланс и кризисы влияют на ожидания участников рынка.',body:'В блоке «Экономические события» новость задаёт импульс, а итоговая цена зависит также от рыночного режима и шума. Это учебная модель взаимосвязей, а не реальные прогнозы и не закон движения цен.',formula:'Изменение цены (%) = (новая цена / старая цена − 1) × 100%.',next:'Сначала предположи реакцию цены, затем запусти сценарий и сравни результат.',example:'Неожиданное сокращение предложения нефти при прочих равных поддерживает цену WTI. Участники рынка, однако, могут заранее учитывать такую новость.',pitfall:'В симуляции импульс новости сочетается с рыночным шумом; на реальном рынке реакция не гарантирована.'},
  {title:'Хеджирование',intro:'Фьючерсы нужны не только для спекуляции, но и для ограничения ценового риска.',body:'Например, добывающая компания может продать фьючерсы на нефть, чтобы частично защититься от падения стоимости будущей добычи. Такой хедж несовершенен из-за отличий цены контракта от цены фактической продажи.',formula:'Хедж = позиция, компенсирующая часть риска основной операции.',next:'Проверь понимание хеджирования в заданиях.',example:'Производитель нефти может продать CL, чтобы частично компенсировать возможное падение выручки от физической добычи.',pitfall:'Хедж может оказаться неполным из-за объёма, срока поставки и разницы цен между физической нефтью и фьючерсом.'}
 ];
-let rng=289503, state, timer=null,chartMode='candle',indicator=false,selectedFrame=15,selectedRange=64,hoverCandle=-1,chartPositions=[],filterFull='ALL',activeLesson=0,modalOpen=false;
+let rng=289503, state, timer=null,chartMode='candle',indicator=false,selectedFrame=15,selectedRange=64,hoverCandle=-1,chartPositions=[],filterFull='ALL',activeLesson=0,selectedReviewIndex=0,modalOpen=false;
 function random(){rng=(Math.imul(rng,1664525)+1013904223)>>>0;return rng/4294967296;}
 function init(){
  rng=DEFAULT_SEED;
@@ -42,7 +43,7 @@ function init(){
  state={cash:START,selected:'MNQ',side:1,qty:1,positions:[],trades:[],logs:[],
   candles:initial.candles,market:initial.market,simTimeMs:initial.simTimeMs,
   realized:0,fees:0,wins:0,closed:0,shocks:0,ticks:0,answered:{},marginStatus:'safe',
-  version:8,learning:createLearningState(DEFAULT_SEED),labs:createLabState(),onboardingDismissed:false,lastScenarioResult:null,ledger:[{id:'opening',kind:'opening',amountCents:cents(START),ref:'session'}]};
+  version:8,learning:createLearningState(DEFAULT_SEED),labs:createLabState(),lessonViews:[],lastLesson:0,onboardingDismissed:false,lastScenarioResult:null,ledger:[{id:'opening',kind:'opening',amountCents:cents(START),ref:'session'}]};
  addLog('INFO','Сессия создана','Котировки и часы синтетические; seed '+DEFAULT_SEED+'.');
  save();
 }
@@ -68,6 +69,8 @@ function load(){
   if(!Number.isSafeInteger(d.market.rng)||!Number.isSafeInteger(d.market.step)||d.market.step<0||d.simTimeMs%STEP_MS!==0)return false;
   d.learning=ensureLearningState(d.learning,d.answered);
   d.labs=ensureLabState(d.labs);
+  d.lessonViews=Array.isArray(d.lessonViews)?[...new Set(d.lessonViews.filter(i=>Number.isInteger(i)&&i>=0&&i<LABS.length))]:[];
+  d.lastLesson=Number.isInteger(d.lastLesson)&&d.lastLesson>=0&&d.lastLesson<LABS.length?d.lastLesson:0;
   d.onboardingDismissed=d.onboardingDismissed===true;
   if(!d.lastScenarioResult||typeof d.lastScenarioResult!=='object')d.lastScenarioResult=null;
   d.version=8;
@@ -153,7 +156,7 @@ function close(p,forced=false,batch=false,stress=false){
  state.fees=dollars(cents(state.fees)+cents(exitFee));
  state.closed++;if(net>0)state.wins++;
  state.positions=state.positions.filter(x=>x.id!==p.id);
- state.trades.unshift({key:p.key,side:p.side,qty:p.qty,entry:p.entry,exit:out,markAtExit:mark,slippageTicks:fill.slippageTicks,fees:dollars(cents(exitFee)+cents(openFee)),net,time:now(),forced,stress:forced&&stress});
+ state.trades.unshift({key:p.key,side:p.side,qty:p.qty,entry:p.entry,exit:out,markAtExit:mark,slippageTicks:fill.slippageTicks,fees:dollars(cents(exitFee)+cents(openFee)),net,time:now(),forced,stress:forced&&stress});selectedReviewIndex=0;
  state.trades=state.trades.slice(0,150);
  addLog('TRADE',(forced?'Принудительное закрытие ':'Закрытие ')+p.key,p.qty+' контрактов по '+num(out,assets[p.key].precision)+'; отметка '+num(mark,assets[p.key].precision)+'; проскальзывание '+fill.slippageTicks+' тик; результат после комиссий '+signedMoney(net),net);
  if(!forced)state.learning=recordPractice(state.learning,'close',String(p.id));
@@ -161,7 +164,7 @@ function close(p,forced=false,batch=false,stress=false){
  if(!batch){checkMargin();save();render();notify('Позиция закрыта · '+signedMoney(net));}
 }
 function setView(name){if(!['terminal','laboratory','journal'].includes(name))return;
- if(name!=='terminal'&&timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ';$('autoPlay').classList.remove('playing');}document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal'){renderGuidedStrip();requestAnimationFrame(renderChart);}if(name==='laboratory')showLesson(activeLesson);window.scrollTo(0,0);}
+ if(name!=='terminal'&&timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ';$('autoPlay').classList.remove('playing');}document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===name));location.hash=name;if(name==='terminal'){renderGuidedStrip();requestAnimationFrame(renderChart);}if(name==='laboratory')showLesson(activeLesson);renderMobilePosition();window.scrollTo(0,0);}
 function setBlotter(name){document.querySelectorAll('#blotterTabs [data-pane]').forEach(x=>x.classList.toggle('active',x.dataset.pane===name));document.querySelectorAll('[data-blotter]').forEach(x=>x.classList.toggle('active',x.dataset.blotter===name));}
 function chooseAsset(key){if(!assets[key])return;state.selected=key;togglePicker(false);save();render();}
 function togglePicker(show){const pop=$('assetPopup');pop.hidden=typeof show==='boolean'?!show:!pop.hidden;if(!pop.hidden){$('marketSearch').focus();renderPicker();}}
@@ -177,7 +180,9 @@ const risk=riskSnapshot(cents(equity()),cents(usedMargin()));const rows=[['marke
  $('placeOrder').disabled=!!pos||!admission.allowed;$('closeSelected').hidden=!pos;$('placeOrder').hidden=!!pos;$('activeOrderPosition').textContent=pos?`${pos.side===1?'Покупка':'Продажа'} ${pos.qty} × ${num(pos.entry,a.precision)} · сейчас ${signedMoney(positionPnl(pos))}`:'Открытых позиций по инструменту нет';const warning=risk.level==='margin_call'?' Дефицит обеспечения.':risk.level==='warning'?' Предупреждение: запас средств сокращается.':'';
 $('riskHint').textContent=pos?'Позиция открыта. Результат на графике оценивается по рыночной отметке, цена выхода может быть хуже.'+warning:!admission.allowed?'Недостаточно свободных средств после исполнения. Не хватает '+money(dollars(admission.shortageCents))+'.'+warning:
 'Учебное исполнение по '+num(fill.price,a.precision)+' (котировка '+num(price,a.precision)+', разница 1 тик). Залог не ограничивает убыток.'+warning;
- $('tradeExplainer').innerHTML=pos?`<div class="explain-row"><span>Открытая позиция</span><b>${pos.side===1?'Покупка':'Продажа'} · ${pos.qty} шт.</b></div><div class="explain-row"><span>Цена входа</span><b>${num(pos.entry,a.precision)}</b></div><div class="explain-row"><span>Текущая цена</span><b>${num(price,a.precision)}</b></div><div class="explain-row"><span>Результат до закрытия</span><b class="${positionPnl(pos)>=0?'up':'down'}">${signedMoney(positionPnl(pos))}</b></div><p>(${num(price,a.precision)} − ${num(pos.entry,a.precision)}) × ${a.mult} × ${pos.qty} × ${pos.side===1?'1':'−1'} = ${signedMoney(positionPnl(pos))}. Комиссия и учебное проскальзывание при закрытии ещё не учтены.</p>`:`<p>Ты выбираешь <b>${state.side===1?'рост':'падение'}</b> цены. Сумма результата зависит от числа контрактов.</p><div class="explain-row"><span>Если угадаешь направление на 1%</span><b class="up">+${money(n*.01)}</b></div><div class="explain-row"><span>Если ошибёшься на 1%</span><b class="down">−${money(n*.01)}</b></div><p>Открой позицию и нажми «+ 1 шаг» под графиком. Комиссии уменьшат результат.</p>`;}
+ $('tradeExplainer').innerHTML=pos?`<div class="explain-row"><span>Открытая позиция</span><b>${pos.side===1?'Покупка':'Продажа'} · ${pos.qty} шт.</b></div><div class="explain-row"><span>Цена входа</span><b>${num(pos.entry,a.precision)}</b></div><div class="explain-row"><span>Текущая цена</span><b>${num(price,a.precision)}</b></div><div class="explain-row"><span>Результат до закрытия</span><b class="${positionPnl(pos)>=0?'up':'down'}">${signedMoney(positionPnl(pos))}</b></div><p>(${num(price,a.precision)} − ${num(pos.entry,a.precision)}) × ${a.mult} × ${pos.qty} × ${pos.side===1?'1':'−1'} = ${signedMoney(positionPnl(pos))}. Комиссия и учебное проскальзывание при закрытии ещё не учтены.</p>`:`<p>Ты выбираешь <b>${state.side===1?'рост':'падение'}</b> цены. Сумма результата зависит от числа контрактов.</p><div class="explain-row"><span>Если угадаешь направление на 1%</span><b class="up">+${money(n*.01)}</b></div><div class="explain-row"><span>Если ошибёшься на 1%</span><b class="down">−${money(n*.01)}</b></div><p>Открой позицию и нажми «+ 1 шаг» под графиком. Комиссии уменьшат результат.</p>`;
+ if(!pos&&state.trades.length){const recent=state.trades.findIndex(t=>t.key===k);if(recent>=0){const t=state.trades[recent],detail=tradeBreakdown(t);$('tradeExplainer').insertAdjacentHTML('beforeend','<div class="last-trade-brief"><strong>ПОСЛЕДНЯЯ СДЕЛКА · '+k+'</strong><span class="'+(detail.net>=0?'up':'down')+'">'+signedMoney(detail.net)+'</span><button class="control-subtle" data-open-review="'+recent+'">РАЗОБРАТЬ ИТОГ →</button></div>');}}
+}
 function renderPositions(){const ps=state.positions;$('positionCount').textContent=`${ps.length} ${ps.length===1?'позиция':'позиций'}`;$('positions').innerHTML=ps.length?ps.map(p=>`<tr><td>${p.key} · ${assets[p.key].name}</td><td class="${p.side===1?'up':'down'}">${p.side===1?'Покупка':'Продажа'}</td><td>${p.qty}</td><td>${num(p.entry,assets[p.key].precision)}</td><td>${num(last(p.key),assets[p.key].precision)}</td><td class="${positionPnl(p)>=0?'up':'down'}">${signedMoney(positionPnl(p))}</td><td><button class="row-close" data-close="${p.id}">Закрыть</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty-cell">Открытых позиций нет. Выберите инструмент и направление справа.</td></tr>';$('positions').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const p=state.positions.find(p=>String(p.id)===b.dataset.close);if(p)close(p);});}
 function renderScenarios(){
  const open=new Set([...$('scenarios').querySelectorAll('details[open][data-scenario-detail]')].map(x=>x.dataset.scenarioDetail));
@@ -199,7 +204,10 @@ function renderScenarios(){
  $('scenarioDetails').textContent=latest?'Результат последнего опыта: '+latest.actual+'. Это синтетические цены, не прогноз.':'Проценты и направление движения раскрываются только после эксперимента.';
 }
 function renderAccounts(){$('accountData').innerHTML=[['Начальный капитал',money(START)],['Доступные средства',money(freeMargin())],['Текущий капитал',money(equity())],['Открытых позиций',state.positions.length],['Комиссии',money(state.fees)]].map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');}
-function renderTrades(){$('tradesRows').innerHTML=state.trades.length?state.trades.slice(0,30).map(t=>`<tr><td>${escapeHtml(t.time)}</td><td>${t.key}</td><td>${t.qty}</td><td>${t.side===1?'Покупка':'Продажа'}</td><td>${num(t.entry,assets[t.key].precision)}</td><td>${num(t.exit,assets[t.key].precision)}</td><td class="${t.net>=0?'up':'down'}">${signedMoney(t.net)}</td></tr>`).join(''):'<tr><td colspan="7" class="empty-cell">Закрытые сделки появятся здесь.</td></tr>';}
+function renderTrades(){
+ $('tradesRows').innerHTML=state.trades.length?state.trades.slice(0,30).map((t,i)=>`<tr><td>${escapeHtml(t.time)}</td><td>${t.key}</td><td>${t.qty}</td><td>${t.side===1?'Покупка':'Продажа'}</td><td>${num(t.entry,assets[t.key].precision)}</td><td>${num(t.exit,assets[t.key].precision)}</td><td class="${t.net>=0?'up':'down'}">${signedMoney(t.net)}</td><td><button class="review-trade" data-review-index="${i}">Разобрать</button></td></tr>`).join(''):'<tr><td colspan="8" class="empty-cell">Закрытые сделки появятся здесь. После первой сделки будет доступен подробный разбор.</td></tr>';
+ $('tradesRows').querySelectorAll('[data-review-index]').forEach(b=>b.onclick=()=>showTradeReview(+b.dataset.reviewIndex));
+}
 function filteredLogs(){return state.logs.filter(x=>filterFull==='ALL'||x.kind===filterFull)}
 function renderLogs(){$('miniLog').innerHTML=state.logs.slice(0,10).map(x=>`<div class="mini-log-row"><time>${escapeHtml(x.time)}</time><span class="mini-kind">${x.kind==='EVENT'?'Событие':x.kind==='TRADE'?'Сделка':'Счёт'}</span><div><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.desc)}</small></div></div>`).join('')||'<div class="no-results">История пуста</div>';$('fullLog').innerHTML=filteredLogs().map(x=>`<div class="full-log-row"><time>${escapeHtml(x.time)}</time><span class="kind">${x.kind==='EVENT'?'Событие':x.kind==='TRADE'?'Сделка':'Счёт'}</span><div><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.desc)}</small></div><span class="${x.amount==null?'':x.amount>=0?'up':'down'}">${x.amount==null?'—':signedMoney(x.amount)}</span></div>`).join('')||'<div class="no-results">По фильтру записей нет</div>';
  $('sessionStats').innerHTML=[['Начальный капитал',money(START)],['Текущий капитал',money(equity())],['Закрытый результат',signedMoney(state.realized)],['Всего закрытых сделок',state.closed],['Из них прибыльных',state.wins],['Комиссии',money(state.fees)],['Макросценарии',state.shocks],['Освоено навыков',learningSummary(state.learning,state.ticks).mastered+'/'+SKILLS.length],['Проверено ответов',learningSummary(state.learning,state.ticks).attempts],['Практических действий',learningSummary(state.learning,state.ticks).practiced+'/'+PRACTICE.length],['Лабораторных выполнено',labSummary(state.labs).complete+'/'+LABS.length]].map(([k,v])=>`<div class="stat-line"><span>${k}</span><b>${v}</b></div>`).join('');}
@@ -282,15 +290,37 @@ function renderGuidedLab(i){
  };
 }
 
+
+function renderCurriculum(){
+ const summary=curriculumSummary(state.learning,state.labs,state.lessonViews,state.ticks);
+ $('curriculumCount').textContent=summary.completed+' / '+summary.total+' ТЕМ';
+ const metrics='<div class="curriculum-summary"><span>Изучено тем <b>'+summary.studied+'/6</b></span><span>Лабораторных сдано <b>'+summary.labsDone+'/6</b></span><span>Тем завершено <b>'+summary.completed+'/6</b></span></div>';
+ const rows=summary.lessons.map(l=>{
+  const info=lessons[l.index];
+  const checklist='<span class="'+(l.studied?'done':'')+'">Теория '+(l.studied?'✓':'○')+'</span><span class="'+(l.labDone?'done':'')+'">Практика '+(l.labDone?'✓':'○')+'</span>'+
+    (l.skillsTotal?'<span class="'+(l.mastered===l.skillsTotal?'done':'')+'">Навыки '+l.mastered+'/'+l.skillsTotal+'</span>':'');
+  return '<button class="curriculum-step '+(l.complete?'completed':'')+(l.index===activeLesson?' current':'')+'" data-curriculum-lesson="'+l.index+'" aria-label="Тема '+(l.index+1)+', '+escapeHtml(info.title)+', '+l.status+'">'+
+    '<span class="curriculum-number">'+String(l.index+1).padStart(2,'0')+'</span><span class="curriculum-name"><strong>'+escapeHtml(info.title)+'</strong><small>'+l.status+'</small></span><span class="curriculum-checks">'+checklist+'</span></button>';
+ }).join('');
+ const recommended=summary.recommendedIndex;
+ const action=recommended===null?'<span class="curriculum-done">Все темы завершены. Можно свободно практиковаться.</span>':
+   '<button class="control-subtle curriculum-resume" data-curriculum-lesson="'+recommended+'">ПРОДОЛЖИТЬ: '+escapeHtml(lessons[recommended].title)+' →</button>';
+ $('curriculumContent').innerHTML=metrics+'<div class="curriculum-steps">'+rows+'</div><div class="curriculum-action">'+action+'</div>';
+ $('curriculumContent').querySelectorAll('[data-curriculum-lesson]').forEach(b=>b.onclick=()=>{showLesson(+b.dataset.curriculumLesson);$('lessonBody').scrollIntoView({behavior:'smooth',block:'start'});});
+}
+
 function showLesson(i){
- activeLesson=i;const l=lessons[i],progress=learningSummary(state.learning,state.ticks);
- $('lessonTabs').innerHTML=lessons.map((x,j)=>`<button data-lesson-tab="${j}" class="${i===j?'active':''}">${j+1}. ${x.title}</button>`).join('');
+ activeLesson=i;state.lastLesson=i;
+ const visible=$('laboratory').classList.contains('active');
+ if(visible&&!state.lessonViews.includes(i)){state.lessonViews.push(i);save();}
+ const l=lessons[i],progress=learningSummary(state.learning,state.ticks),overview=curriculumSummary(state.learning,state.labs,state.lessonViews,state.ticks);
+ $('lessonTabs').innerHTML=lessons.map((x,j)=>`<button data-lesson-tab="${j}" class="${i===j?'active':''}" ${i===j?'aria-current="step"':''}>${j+1}. ${x.title}${overview.lessons[j].complete?' ✓':''}</button>`).join('');
  const completed=SKILLS.filter(s=>s.lesson===i&&state.learning.skills[s.id].mastered);
  const skillCount=SKILLS.filter(s=>s.lesson===i).length;
  const topicProgress=skillCount?'Навыки по теме: '+completed.length+'/'+skillCount+'.':'Тема закрепляется практикой в терминале.';
  const milestone=PRACTICE.map(p=>`${state.learning.actions[p.id]>0?'✓':'○'} ${p.title}`).join(' · ');
  $('lessonBody').innerHTML=`<h2>${escapeHtml(l.title)}</h2><p>${escapeHtml(l.intro)}</p><p>${escapeHtml(l.body)}</p><div class="lesson-formula">${escapeHtml(l.formula)}</div><p><b>Пример:</b> ${escapeHtml(l.example)}</p><p><b>Не путай:</b> ${escapeHtml(l.pitfall)}</p><p class="lesson-next"><b>Попробуй:</b> ${escapeHtml(l.next)}</p><p>${escapeHtml(topicProgress)} Действия в терминале: ${progress.practiced}/${progress.practiceTotal}.</p><div class="lesson-actions"><button id="goToTerminal" class="control-subtle">К ТОРГОВЛЕ</button><button id="lessonNext" class="control-subtle">${i===lessons.length-1?'К ЗАДАНИЯМ':'СЛЕДУЮЩАЯ ТЕМА'} →</button></div>`;
- renderGuidedLab(i);renderGuidedStrip();
+ renderGuidedLab(i);renderGuidedStrip();renderCurriculum();
  $('lessonTabs').querySelectorAll('[data-lesson-tab]').forEach(b=>b.onclick=()=>showLesson(+b.dataset.lessonTab));
  $('goToTerminal').onclick=()=>setView('terminal');
  $('lessonNext').onclick=()=>i===lessons.length-1?$('labs').scrollIntoView({behavior:'smooth'}):showLesson(i+1);
@@ -318,6 +348,7 @@ function renderLabs(){
   try{state.learning=nextQuestion(state.learning,b.dataset.nextSkill);save();renderLabs();}catch(e){notify(e.message);}
  });
  const toTerminal=$('labs').querySelector('[data-learning-terminal]');if(toTerminal)toTerminal.onclick=()=>setView('terminal');
+ renderCurriculum();
 }
 
 function renderRiskExplanation(){
@@ -360,7 +391,49 @@ function renderGuidedStrip(){
  box.innerHTML='<div class="guided-strip-copy"><strong>ВПЕРВЫЕ В ТЕРМИНАЛЕ?</strong><span>Начни с короткого урока и первой лабораторной. Свободная практика тоже доступна.</span></div><button class="control-subtle" data-guide="start">НАЧАТЬ ОБУЧЕНИЕ →</button><button class="guide-dismiss" data-guide="dismiss" aria-label="Скрыть подсказку">×</button>';
 }
 
-function render(){renderGuidedStrip();renderMetrics();renderHeader();renderTicket();renderRiskExplanation();renderPositions();renderScenarios();renderAccounts();renderTrades();renderLogs();renderLabs();requestAnimationFrame(renderChart);}
+
+function renderTradeReview(){
+ const target=$('tradeReview');if(!target)return;
+ if(!state.trades.length){target.innerHTML='<div class="trade-review-empty"><strong>РАЗБОР ЗАКРЫТОЙ СДЕЛКИ</strong><p>Закрой первую позицию, чтобы увидеть, откуда взялся результат после исполнения и комиссий.</p></div>';return;}
+ selectedReviewIndex=Math.max(0,Math.min(selectedReviewIndex,state.trades.length-1));
+ const t=state.trades[selectedReviewIndex],x=tradeBreakdown(t);
+ const details=[
+  ['Результат по рыночной отметке',signedMoney(x.marketGross)],
+  ...(Number.isFinite(t.markAtExit)?[['Влияние цены исполнения',signedMoney(-x.slippageCost)]]:[]),
+  ['Комиссии входа и выхода','−'+money(x.fees)]
+ ];
+ const rows=details.map(([label,value])=>'<div class="trade-review-row"><span>'+label+'</span><b>'+value+'</b></div>').join('');
+ const forced=x.forced?'<p class="review-warning">Позиция принудительно закрыта. При скачке рынка выход может быть хуже ожидаемой цены.</p>':'';
+ const caveat=Number.isFinite(t.markAtExit)?'Разница между рыночной отметкой и фактическим исполнением учтена в строке выше.':'Для старой сделки рыночная отметка недоступна; отдельно оценить проскальзывание нельзя.';
+ const consistency=x.matchesSavedNet?'':'<p class="review-warning">Исторический итог отличается от пересчитанного результата. Проверьте исходное сохранение.</p>';
+ target.innerHTML='<div class="trade-review-header"><strong>РАЗБОР СДЕЛКИ</strong><span>'+(selectedReviewIndex+1)+' / '+state.trades.length+'</span></div>'+
+ '<p class="trade-review-caption">'+x.key+' · '+x.direction+' · '+x.quantity+' контр. · '+escapeHtml(t.time||'')+'</p>'+
+ '<p class="trade-review-prices">Вход '+num(x.entry,assets[x.key].precision)+' → исполнение выхода '+num(x.exit,assets[x.key].precision)+'</p>'+
+ rows+'<div class="trade-review-total"><span>ИТОГ ПОСЛЕ КОМИССИЙ</span><strong class="'+(x.net>=0?'up':'down')+'">'+signedMoney(x.net)+'</strong></div>'+
+ '<p class="trade-review-note">'+caveat+' Прибыль и убыток не равны качеству принятого решения.</p>'+forced+consistency+
+ '<div class="trade-review-nav"><button class="control-subtle" data-review-step="-1" '+(selectedReviewIndex===0?'disabled':'')+'>← Новее</button><button class="control-subtle" data-review-step="1" '+(selectedReviewIndex>=state.trades.length-1?'disabled':'')+'>Раньше →</button></div>';
+ target.querySelectorAll('[data-review-step]').forEach(b=>b.onclick=()=>{selectedReviewIndex+=+b.dataset.reviewStep;renderTradeReview();});
+}
+function showTradeReview(index=0){
+ selectedReviewIndex=Math.max(0,Math.min(index,state.trades.length-1));setView('journal');renderTradeReview();
+ $('tradeReview').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function renderMobilePosition(){
+ const bar=$('mobilePositionBar');if(!bar)return;
+ const shown=$('terminal').classList.contains('active')&&state.positions.length>0;
+ bar.hidden=!shown;
+ document.body.classList.toggle('mobile-position-visible',shown);
+ if(!shown)return;
+ const position=state.positions.find(p=>p.key===state.selected)||state.positions[0];
+ const pnl=positionPnl(position);
+ bar.innerHTML='<div class="mobile-position-summary"><strong>'+position.key+' · '+(position.side===1?'LONG':'SHORT')+'</strong><span class="'+(pnl>=0?'up':'down')+'">'+signedMoney(pnl)+'</span></div><button class="control-subtle" data-mobile-position="'+position.id+'">К ПОЗИЦИИ →</button>';
+ bar.querySelector('button').onclick=()=>{
+  state.selected=position.key;save();render();
+  const target=$('closeSelected');target.scrollIntoView({behavior:'smooth',block:'center'});target.focus({preventScroll:true});
+ };
+}
+
+function render(){renderGuidedStrip();renderMetrics();renderHeader();renderTicket();renderRiskExplanation();renderPositions();renderScenarios();renderAccounts();renderTrades();renderLogs();renderTradeReview();renderLabs();renderMobilePosition();requestAnimationFrame(renderChart);}
 function renderChart(){const canvas=$('priceChart');if(!canvas || !canvas.getClientRects().length || canvas.clientWidth<10)return;const rect=canvas.getBoundingClientRect(),w=rect.width,h=rect.height,dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);const a=assetDefs[state.selected],all=aggregateBars(state.candles[state.selected],selectedFrame),points=all.slice(-selectedRange),left=8,right=w>500?65:55,top=7,bottom=31,volH=0,mainBottom=h-volH-bottom,plotWidth=w-left-right;const allHigh=Math.max(...points.map(c=>c.h)),allLow=Math.min(...points.map(c=>c.l)),pad=Math.max((allHigh-allLow)*.24,allLow*.001);const hi=allHigh+pad,lo=allLow-pad,priceY=p=>top+(hi-p)/(hi-lo)*(mainBottom-top);const colorUp='#52b39b',colorDn='#d66273';chartPositions=[];
  ctx.font='10px Arial, sans-serif';ctx.textBaseline='middle';for(let j=0;j<=4;j++){const yp=top+(mainBottom-top)*j/4;ctx.beginPath();ctx.moveTo(left,yp);ctx.lineTo(w-right+7,yp);ctx.strokeStyle='#4a536044';ctx.lineWidth=.7;ctx.stroke();ctx.fillStyle='#bac6d2';ctx.fillText(num(hi-(hi-lo)*j/4,a.precision),w-right+13,yp)}for(let j=0;j<=7;j++){const xp=left+(plotWidth*j/7);ctx.beginPath();ctx.moveTo(xp,top);ctx.lineTo(xp,h-bottom);ctx.strokeStyle='#3c485038';ctx.stroke();}
  const unit=plotWidth/Math.max(points.length,1),barW=Math.min(Math.max(unit*.62,2),11),maxVol=Math.max(...points.map(c=>c.v),1);
@@ -396,6 +469,7 @@ function bind(){
  for(const id of ['symbolPicker','assetSelector','assetPickerRail'])$(id).onclick=()=>{if(id==='assetPickerRail')setView('terminal');togglePicker(true)};
  $('assetPopupClose').onclick=()=>togglePicker(false);$('marketSearch').oninput=renderPicker;document.addEventListener('pointerdown',e=>{if(!$('assetPopup').hidden&&!e.target.closest('#assetPopup')&&!e.target.closest('#symbolPicker')&&!e.target.closest('#assetSelector')&&!e.target.closest('#assetPickerRail'))togglePicker(false)});
  $('longButton').onclick=()=>{state.side=1;save();renderTicket()};$('shortButton').onclick=()=>{state.side=-1;save();renderTicket()};$('qtyDown').onclick=()=>{state.qty=Math.max(1,state.qty-1);save();renderTicket()};$('qtyUp').onclick=()=>{state.qty=Math.min(20,state.qty+1);save();renderTicket()};$('placeOrder').onclick=()=>open(state.side);$('closeSelected').onclick=()=>{const p=state.positions.find(x=>x.key===state.selected);if(p)close(p)};
+ $('tradeExplainer').onclick=e=>{const button=e.target.closest('[data-open-review]');if(button)showTradeReview(+button.dataset.openReview);};
  $('guidedStrip').onclick=e=>{const action=e.target.closest('[data-guide]')?.dataset.guide;if(action==='resume'){const i=LABS.findIndex(l=>l.id===state.labs.active);setView('laboratory');showLesson(Math.max(i,0));}else if(action==='start'){setView('laboratory');showLesson(0);}else if(action==='dismiss'){state.onboardingDismissed=true;save();renderGuidedStrip();}};
  $('tickOne').onclick=()=>tick(1);$('tickTen').onclick=()=>tick(10);$('autoPlay').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ';$('autoPlay').classList.remove('playing');}else{timer=setInterval(()=>tick(1),1200);$('autoPlay').textContent='Ⅱ ПАУЗА';$('autoPlay').classList.add('playing');}};
  $('timeframes').querySelectorAll('[data-frame]').forEach(b=>b.onclick=()=>{selectedFrame=+b.dataset.frame;$('timeframes').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));renderHeader();renderChart();});
@@ -404,8 +478,8 @@ function bind(){
  const learn=(i)=>{setView('laboratory');showLesson(i)};$('helpChart').onclick=()=>learn(0);document.querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>learn(+b.dataset.lesson));$('scenarioLesson').onclick=()=>learn(4);
  $('macroRail').onclick=()=>{setView('terminal');$('scenariosPanel').scrollIntoView({behavior:'smooth',block:'nearest'});};$('blotterTabs').querySelectorAll('[data-pane]').forEach(b=>b.onclick=()=>setBlotter(b.dataset.pane));
  $('fullJournalFilters').querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{filterFull=b.dataset.kind;$('fullJournalFilters').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));renderLogs()});
- $('newSession').onclick=showReset;$('modalClose').onclick=closeModal;$('modalCancel').onclick=closeModal;$('modalConfirm').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ'}init();render();showLesson(activeLesson);setBlotter('positions');closeModal();notify('Учебный счёт сброшен.');};$('modal').onclick=e=>{if(e.target===$('modal'))closeModal()};
+ $('newSession').onclick=showReset;$('modalClose').onclick=closeModal;$('modalCancel').onclick=closeModal;$('modalConfirm').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ'}init();selectedReviewIndex=0;render();showLesson(0);setBlotter('positions');closeModal();notify('Учебный счёт сброшен.');};$('modal').onclick=e=>{if(e.target===$('modal'))closeModal()};
  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(modalOpen)closeModal();togglePicker(false)}});$('exportJournal').onclick=exportCSV;window.addEventListener('resize',()=>requestAnimationFrame(renderChart));
 }
-if(!load())init();checkMargin();save();bind();showLesson(0);render();if(['#terminal','#laboratory','#journal'].includes(location.hash))setView(location.hash.slice(1));
+if(!load())init();checkMargin();save();bind();showLesson(state.lastLesson||0);render();if(['#terminal','#laboratory','#journal'].includes(location.hash))setView(location.hash.slice(1));
 })();
