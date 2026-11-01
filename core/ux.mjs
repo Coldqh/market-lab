@@ -35,10 +35,11 @@ export function tradeBreakdown(trade){
  const slippageCents=marketGrossCents-grossCents;
  const feesCents=Number.isFinite(trade.fees)?cents(trade.fees):feeCents(symbol,trade.entry,trade.qty)+feeCents(symbol,trade.exit,trade.qty);
  const netCents=grossCents-feesCents;
+ const clean=n=>Object.is(n,-0)?0:n;
  return {key:symbol,direction:trade.side===1?'Покупка':'Продажа',
   entry:trade.entry,exit:trade.exit,markAtExit:marketPrice,quantity:trade.qty,
-  marketGross:dollars(marketGrossCents),slippageCost:dollars(slippageCents),
-  gross:dollars(grossCents),fees:dollars(feesCents),net:dollars(netCents),
+  marketGross:clean(dollars(marketGrossCents)),slippageCost:clean(dollars(slippageCents)),
+  gross:clean(dollars(grossCents)),fees:clean(dollars(feesCents)),net:clean(dollars(netCents)),
   forced:trade.forced===true,slippageTicks:Number.isSafeInteger(trade.slippageTicks)?trade.slippageTicks:null,
   matchesSavedNet:typeof trade.net!=='number'||Math.abs(trade.net-dollars(netCents))<.011};
 }
