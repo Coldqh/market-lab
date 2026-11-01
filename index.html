@@ -83,11 +83,11 @@
          </div>
         </details>
        </div>
-       <div class="risk-hint" id="riskHint">Обеспечение — залог, а не предел убытка.</div>
+       <div class="risk-hint" id="riskHint">Обеспечение — залог, а не предел убытка.</div><div id="tradeActionFeedback" class="trade-inline-status" role="status" aria-live="polite"></div>
       </div>
       <div class="trade-action-footer">
        <div class="order-position-label" id="activeOrderPosition">Открытых позиций по инструменту нет</div>
-       <button class="buy-btn primary-trade" id="placeOrder">ОТКРЫТЬ ПОКУПКУ</button>
+       <button class="buy-btn primary-trade" id="placeOrder" aria-describedby="riskHint tradeActionFeedback">ОТКРЫТЬ ПОКУПКУ</button>
        <button class="control-subtle full-width" id="closeSelected" hidden>ЗАКРЫТЬ ПОЗИЦИЮ</button>
       </div>
      </div>
@@ -115,7 +115,7 @@
    <section class="pane curriculum-pane" id="curriculumPanel" aria-label="Карта обучения"><div class="pane-tabs"><span class="pane-tab active">МАРШРУТ ОБУЧЕНИЯ</span><span class="pane-fill"></span><span class="pane-meta" id="curriculumCount">0 / 6</span></div><div class="curriculum-content" id="curriculumContent"></div></section><div class="lab-layout"><div class="learning-main"><section class="pane lesson-pane"><div class="pane-tabs"><span class="pane-tab active">Теория · 6 коротких тем</span></div><div class="lesson-tabs" id="lessonTabs"></div><div class="lesson-body" id="lessonBody"></div></section><div class="lab-cards" id="labs"></div></div><aside class="pane glossary"><div class="pane-tabs"><span class="pane-tab active">СПРАВОЧНИК</span></div><div class="glossary-content"><h3>Фьючерс</h3><p>Контракт, результат которого зависит от цены базового актива. Здесь все расчёты виртуальные.</p><h3>Номинал</h3><p>Цена × множитель × количество контрактов.</p><h3>Обеспечение (маржа)</h3><p>Сумма, необходимая для удержания позиции. Это не лимит потерь.</p><h3>Прибыль и убыток</h3><p>Изменение цены × множитель × количество × направление сделки. Комиссии вычитаются отдельно.</p><h3>Хеджирование</h3><p>Сделка для уменьшения ценового риска другой позиции или будущей операции.</p></div></aside></div>
   </section>
   <section class="view alternate-view" id="journal" aria-label="История">
-   <header class="alt-title"><div><div class="eyebrow">РАЗДЕЛ / 03</div><h1>История торговли</h1><p>Сделки, комиссии, макроэкономические события и результаты учебной сессии.</p></div><button class="outline-danger" id="newSession">НОВАЯ СЕССИЯ</button></header>
+   <header class="alt-title"><div><div class="eyebrow">РАЗДЕЛ / 03</div><h1>История торговли</h1><p>Сделки, комиссии, макроэкономические события и результаты учебной сессии.</p></div><button class="outline-danger" id="newSession">УПРАВЛЕНИЕ СЕССИЕЙ</button></header>
    <div class="journal-layout"><section class="pane"><div class="pane-tabs"><span class="pane-tab active">ЖУРНАЛ ОПЕРАЦИЙ</span></div><div class="filters journal-filters" id="fullJournalFilters"><button class="active" data-kind="ALL">Все</button><button data-kind="TRADE">Сделки</button><button data-kind="EVENT">События</button></div><div id="fullLog" class="full-log"></div></section><aside class="pane journal-stats"><div class="pane-tabs"><span class="pane-tab active">СТАТИСТИКА СЕССИИ</span></div><div id="sessionStats"></div><div id="tradeReview" class="trade-review" aria-live="polite"></div><button id="exportJournal" class="export-button">СКАЧАТЬ ЖУРНАЛ (CSV) ↓</button></aside></div>
   </section>
  </main>
@@ -123,7 +123,7 @@
  <div class="status-footer"><span>MARKET / LAB · УЧЕБНЫЙ ТЕРМИНАЛ</span><span>БЕЗ РЕАЛЬНЫХ ДЕНЕГ</span><span class="status-right">Сценарии условные, не инвестиционная рекомендация</span></div>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<div class="modal-overlay" id="modal" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">Новая сессия</h2><button id="modalClose" aria-label="Закрыть">×</button></div><p id="modalDescription"></p><div class="modal-buttons"><button id="modalCancel">ОТМЕНА</button><button id="modalConfirm">ПОДТВЕРДИТЬ</button></div></div></div>
+<div class="modal-overlay" id="modal" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">Управление данными</h2><button id="modalClose" aria-label="Закрыть">×</button></div><fieldset class="reset-choices" id="resetChoices"><legend>Что начать заново?</legend><label><input type="radio" name="resetMode" value="trade" checked><span><strong>Торговая сессия</strong><small>Баланс, рынок, сделки и история. Знания остаются.</small></span></label><label><input type="radio" name="resetMode" value="learning"><span><strong>Только обучение</strong><small>Темы, задачи и лабораторные. Торговый счёт остаётся.</small></span></label><label><input type="radio" name="resetMode" value="all"><span><strong>Всё полностью</strong><small>Без сохранения учебного или торгового прогресса.</small></span></label></fieldset><p id="modalDescription" class="reset-explanation"></p><div class="modal-buttons"><button id="modalCancel">ОТМЕНА</button><button id="modalConfirm">НАЧАТЬ НОВУЮ СЕССИЮ</button></div></div></div>
 <script type="module" src="app.js"></script>
 </body>
 </html>

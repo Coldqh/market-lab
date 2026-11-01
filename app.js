@@ -4,6 +4,7 @@ import {DEFAULT_SEED,SIM_EPOCH,STEP_MS,REGIMES,createMarket,createInitialHistory
 import {SKILLS,PRACTICE,createLearningState,ensureLearningState,buildQuestion,gradeQuestion,nextQuestion,recordPractice,learningSummary} from './core/learning.mjs';
 import {LABS,createLabState,ensureLabState,startLab,resumeLab,setLabPrediction,captureLabContext,numericLabContext,submitLabNumber,recordLabEvent,labSummary} from './core/labs.mjs';
 import {curriculumSummary,tradeBreakdown} from './core/ux.mjs';
+import {RESET_MODES,tradingResetRetention,freshLearning,resetSummary} from './core/session.mjs';
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -134,16 +135,16 @@ function checkMargin(stress=false){
 }
 function open(side){
  const key=state.selected,mark=last(key),q=state.qty;
- if(state.positions.some(p=>p.key===key)){notify('По инструменту уже открыта позиция.');return false;}
+ if(state.positions.some(p=>p.key===key)){showTradeError('По этому инструменту уже открыта позиция. Закройте её перед новой сделкой.');return false;}
  const fill=executionPrice(key,mark,side),required=marginCents(key,fill.price,q),entryFee=feeCents(key,fill.price,q);
  const openingImpact=-grossPnlCents(key,fill.price,mark,q,side);
  const admission=validateOpening({equityCents:cents(equity()),usedMarginCents:cents(usedMargin()),newMarginCents:required,entryFeeCents:entryFee,adverseFillCents:openingImpact});
- if(!admission.allowed){notify(admission.reason==='no_equity'?'На счёте нет свободного капитала.':'Недостаточно обеспечения с учётом исполнения. Не хватает '+money(dollars(admission.shortageCents))+'.');return false;}
+ if(!admission.allowed){showTradeError(admission.reason==='no_equity'?'На счёте нет свободного капитала. Начните новую торговую сессию через «История → Управление сессией».':'Недостаточно средств с учётом залога, комиссии и исполнения. Не хватает '+money(dollars(admission.shortageCents))+'. Уменьшите количество контрактов.');return false;}
  const pos={id:Date.now()+Math.floor(random()*100000),key,side,qty:q,entry:fill.price,margin:dollars(required),openFee:dollars(entryFee),time:now()};
  ledgerPost('entry_fee',-entryFee,pos.id);state.fees=dollars(cents(state.fees)+entryFee);state.realized=dollars(cents(state.realized)-entryFee);state.positions.push(pos);state.side=side;
  addLog('TRADE',(side===1?'Покупка ':'Продажа ')+key,q+' контрактов по '+num(fill.price,assets[key].precision)+' (котировка '+num(mark,assets[key].precision)+', 1 тик проскальзывания); комиссия '+money(dollars(entryFee)),-dollars(entryFee));
  checkMargin();state.learning=recordPractice(state.learning,side===1?'openLong':'openShort',String(pos.id));
- state.labs=recordLabEvent(state.labs,'open',{positionId:String(pos.id),side,symbol:key});save();render();setBlotter('positions');notify('Позиция открыта по '+num(fill.price,assets[key].precision)+'. Цена исполнения отличается от котировки.');return true;
+ state.labs=recordLabEvent(state.labs,'open',{positionId:String(pos.id),side,symbol:key});clearTradeError();save();render();setBlotter('positions');notify('Позиция открыта по '+num(fill.price,assets[key].precision)+'. Цена исполнения отличается от котировки.');return true;
 }
 function close(p,forced=false,batch=false,stress=false){
  if(!state.positions.some(x=>x.id===p.id))return;
@@ -172,15 +173,40 @@ function renderPicker(){const q=$('marketSearch').value.trim().toLocaleLowerCase
 function renderMetrics(){const up=state.positions.reduce((s,p)=>s+positionPnl(p),0),eq=equity(),margin=usedMargin(),free=freeMargin(),risk=riskSnapshot(cents(eq),cents(margin));
  $('equity').textContent=money(eq);$('freeMargin').textContent=money(free);$('totalPnl').textContent=signedMoney(state.realized);$('totalPnl').className=state.realized>=0?'up':'down';$('unrealizedPnl').textContent=signedMoney(up);$('unrealizedPnl').className=up>=0?'up':'down';$('usedMargin').textContent=money(margin);$('riskPct').textContent=num(eq>0?margin/eq*100:margin>0?100:0,1)+'%';$('riskPct').title='Запас до порога ликвидации: '+money(dollars(risk.cushionCents))+' · '+risk.level;$('riskBar').style.width=Math.max(0,Math.min(100,eq>0?margin/eq*100:margin>0?100:0))+'%';}
 function renderHeader(){const key=state.selected,a=assets[key],bars=state.candles[key],c=bars.at(-1),prev=bars.at(-2)||c;$('symbolTicker').textContent=key;$('watermarkTicker').textContent=key;$('watermarkContract').textContent=a.small;$('chartFullSymbol').textContent=a.name+' · '+(selectedFrame===15?'15 мин':selectedFrame===60?'1 час':'4 часа')+' · '+REGIMES[state.market.regime].name;$('ohlc').textContent=`О ${num(c.o,a.precision)} · МАКС ${num(c.h,a.precision)} · МИН ${num(c.l,a.precision)} · З ${num(c.c,a.precision)}`;$('priceChange').textContent=pct((c.c/prev.c-1)*100);$('priceChange').className=c.c>=prev.c?'up':'down';$('ticketAssetIcon').textContent=a.icon;$('ticketCode').textContent=key;$('ticketLabel').textContent=a.small;$('timeNow').textContent=formatSimTime(state.simTimeMs)+' UTC / СИМ';}
+
+function showTradeError(message){
+ const target=$('tradeActionFeedback');
+ target.textContent=message;target.classList.add('has-error');target.setAttribute('role','alert');
+}
+function clearTradeError(){
+ const target=$('tradeActionFeedback');target.textContent='';target.classList.remove('has-error');target.setAttribute('role','status');
+}
+function updateTradeActionFeedback(position,admission,risk){
+ const target=$('tradeActionFeedback');
+ if(target.classList.contains('has-error')){
+  // Clear errors after changes to direction, quantity, or available funds, then show current status.
+  clearTradeError();
+ }
+ let message='';
+ if(position)message='По этому инструменту уже есть позиция. Чтобы изменить направление или объём, сначала закройте её.';
+ else if(!admission.allowed)message=admission.reason==='no_equity'?'Свободного капитала нет. Новые сделки недоступны.':
+   'Недостаточно обеспечения. Не хватает '+money(dollars(admission.shortageCents))+'. Попробуйте меньше контрактов или другой инструмент.';
+ else if(risk.level==='margin_call')message='На счёте дефицит маржи. Сократите действующие позиции.';
+ target.textContent=message;
+ target.classList.toggle('is-warning',!!message&&!position);
+}
+
 function renderTicket(){const k=state.selected,a=assets[k],price=last(k),fill=executionPrice(k,price,state.side);
 const n=dollars(notionalCents(k,fill.price,state.qty)),margin=dollars(marginCents(k,fill.price,state.qty)),comm=fee(k,state.qty,fill.price),pos=state.positions.find(p=>p.key===k);
 const admission=validateOpening({equityCents:cents(equity()),usedMarginCents:cents(usedMargin()),newMarginCents:marginCents(k,fill.price,state.qty),entryFeeCents:feeCents(k,fill.price,state.qty),adverseFillCents:-grossPnlCents(k,fill.price,price,state.qty,state.side)});
 const risk=riskSnapshot(cents(equity()),cents(usedMargin()));const rows=[['marketPrice',num(price,a.precision)],['multiplier',`${money(a.mult)} / ${a.unit}`],['notional',money(n)],['initialMargin',money(margin)],['fee',money(comm)],['afterMargin',money(dollars(admission.projectedEquityCents-admission.requiredCents))],['onePercent',`−${money(n*.01)}`]];rows.forEach(([id,v])=>$(id).textContent=v);
  $('quantity').textContent=state.qty;$('longButton').classList.toggle('selected',state.side===1);$('shortButton').classList.toggle('selected',state.side===-1);$('directionHelp').textContent=state.side===1?'Ты рассчитываешь на рост цены. При падении будет убыток.':'Ты рассчитываешь на падение цены. При росте будет убыток.';$('placeOrder').textContent=state.side===1?'ОТКРЫТЬ НА РОСТ':'ОТКРЫТЬ НА ПАДЕНИЕ';$('placeOrder').classList.toggle('sell-btn',state.side===-1);$('placeOrder').classList.toggle('buy-btn',state.side===1);
- $('placeOrder').disabled=!!pos||!admission.allowed;$('closeSelected').hidden=!pos;$('placeOrder').hidden=!!pos;$('activeOrderPosition').textContent=pos?`${pos.side===1?'Покупка':'Продажа'} ${pos.qty} × ${num(pos.entry,a.precision)} · сейчас ${signedMoney(positionPnl(pos))}`:'Открытых позиций по инструменту нет';const warning=risk.level==='margin_call'?' Дефицит обеспечения.':risk.level==='warning'?' Предупреждение: запас средств сокращается.':'';
+ $('placeOrder').disabled=!!pos||!admission.allowed;
+ $('qtyDown').disabled=!!pos;$('qtyUp').disabled=!!pos;$('longButton').disabled=!!pos;$('shortButton').disabled=!!pos;
+ updateTradeActionFeedback(pos,admission,risk);$('closeSelected').hidden=!pos;$('placeOrder').hidden=!!pos;$('activeOrderPosition').textContent=pos?`${pos.side===1?'Покупка':'Продажа'} ${pos.qty} × ${num(pos.entry,a.precision)} · сейчас ${signedMoney(positionPnl(pos))}`:'Открытых позиций по инструменту нет';const warning=risk.level==='margin_call'?' Дефицит обеспечения.':risk.level==='warning'?' Предупреждение: запас средств сокращается.':'';
 $('riskHint').textContent=pos?'Позиция открыта. Результат на графике оценивается по рыночной отметке, цена выхода может быть хуже.'+warning:!admission.allowed?'Недостаточно свободных средств после исполнения. Не хватает '+money(dollars(admission.shortageCents))+'.'+warning:
 'Учебное исполнение по '+num(fill.price,a.precision)+' (котировка '+num(price,a.precision)+', разница 1 тик). Залог не ограничивает убыток.'+warning;
- $('tradeExplainer').innerHTML=pos?`<div class="explain-row"><span>Открытая позиция</span><b>${pos.side===1?'Покупка':'Продажа'} · ${pos.qty} шт.</b></div><div class="explain-row"><span>Цена входа</span><b>${num(pos.entry,a.precision)}</b></div><div class="explain-row"><span>Текущая цена</span><b>${num(price,a.precision)}</b></div><div class="explain-row"><span>Результат до закрытия</span><b class="${positionPnl(pos)>=0?'up':'down'}">${signedMoney(positionPnl(pos))}</b></div><p>(${num(price,a.precision)} − ${num(pos.entry,a.precision)}) × ${a.mult} × ${pos.qty} × ${pos.side===1?'1':'−1'} = ${signedMoney(positionPnl(pos))}. Комиссия и учебное проскальзывание при закрытии ещё не учтены.</p>`:`<p>Ты выбираешь <b>${state.side===1?'рост':'падение'}</b> цены. Сумма результата зависит от числа контрактов.</p><div class="explain-row"><span>Если угадаешь направление на 1%</span><b class="up">+${money(n*.01)}</b></div><div class="explain-row"><span>Если ошибёшься на 1%</span><b class="down">−${money(n*.01)}</b></div><p>Открой позицию и нажми «+ 1 шаг» под графиком. Комиссии уменьшат результат.</p>`;
+ $('tradeExplainer').innerHTML=pos?`<div class="explain-row"><span>Открытая позиция</span><b>${pos.side===1?'Покупка':'Продажа'} · ${pos.qty} шт.</b></div><div class="explain-row"><span>Цена входа</span><b>${num(pos.entry,a.precision)}</b></div><div class="explain-row"><span>Текущая цена</span><b>${num(price,a.precision)}</b></div><div class="explain-row"><span>Результат до закрытия</span><b class="${positionPnl(pos)>=0?'up':'down'}">${signedMoney(positionPnl(pos))}</b></div><p>(${num(price,a.precision)} − ${num(pos.entry,a.precision)}) × ${a.mult} × ${pos.qty} × ${pos.side===1?'1':'−1'} = ${signedMoney(positionPnl(pos))}. Комиссия и учебное проскальзывание при закрытии ещё не учтены.</p>`:`<p>Ты выбираешь <b>${state.side===1?'рост':'падение'}</b> цены. Сумма результата зависит от числа контрактов.</p><div class="explain-row"><span>Если угадаешь направление на 1%</span><b class="up">+${money(n*.01)}</b></div><div class="explain-row"><span>Если ошибёшься на 1%</span><b class="down">−${money(n*.01)}</b></div><p>Открой позицию и нажми «+15 мин» под графиком. Комиссии уменьшат результат.</p>`;
  if(!pos&&state.trades.length){const recent=state.trades.findIndex(t=>t.key===k);if(recent>=0){const t=state.trades[recent],detail=tradeBreakdown(t);$('tradeExplainer').insertAdjacentHTML('beforeend','<div class="last-trade-brief"><strong>ПОСЛЕДНЯЯ СДЕЛКА · '+k+'</strong><span class="'+(detail.net>=0?'up':'down')+'">'+signedMoney(detail.net)+'</span><button class="control-subtle" data-open-review="'+recent+'">РАЗОБРАТЬ ИТОГ →</button></div>');}}
 }
 function renderPositions(){const ps=state.positions;$('positionCount').textContent=`${ps.length} ${ps.length===1?'позиция':'позиций'}`;$('positions').innerHTML=ps.length?ps.map(p=>`<tr><td>${p.key} · ${assets[p.key].name}</td><td class="${p.side===1?'up':'down'}">${p.side===1?'Покупка':'Продажа'}</td><td>${p.qty}</td><td>${num(p.entry,assets[p.key].precision)}</td><td>${num(last(p.key),assets[p.key].precision)}</td><td class="${positionPnl(p)>=0?'up':'down'}">${signedMoney(positionPnl(p))}</td><td><button class="row-close" data-close="${p.id}">Закрыть</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty-cell">Открытых позиций нет. Выберите инструмент и направление справа.</td></tr>';$('positions').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const p=state.positions.find(p=>String(p.id)===b.dataset.close);if(p)close(p);});}
@@ -256,7 +282,7 @@ function renderGuidedLab(i){
   if(['contract','position-pnl','margin'].includes(lab.id)){
    const available=lab.id!=='position-pnl'||!!locked.position;
    description+='<p class="lab-locked-info">Исходные числа зафиксированы. Дальнейшее движение рынка не изменит ответ.</p>';
-   controls='<div class="lesson-actions"><input id="labNumber" type="text" inputmode="decimal" autocomplete="off" aria-label="Ответ в долларах" placeholder="Ответ в $" style="width:min(100%,200px);padding:7px 9px;color:#e5e9ee;background:#1b2128;border:1px solid #38434e;border-radius:0" '+(available?'':'disabled')+'><button class="control-subtle" id="labSubmit" '+(available?'':'disabled')+'>ПРОВЕРИТЬ РАСЧЁТ</button></div>';
+   controls='<div class="lesson-actions"><input id="labNumber" type="text" inputmode="decimal" autocomplete="off" aria-label="Ответ в долларах" aria-describedby="labInlineError" placeholder="Ответ в $" style="width:min(100%,200px);padding:7px 9px;color:#e5e9ee;background:#1b2128;border:1px solid #38434e;border-radius:0" '+(available?'':'disabled')+'><button class="control-subtle" id="labSubmit" '+(available?'':'disabled')+'>ПРОВЕРИТЬ РАСЧЁТ</button></div><p id="labInlineError" class="lab-inline-error" role="alert" hidden></p>';
   }else if(['macro','hedge'].includes(lab.id)){
    controls='<div class="answer-grid"><button class="answer-option '+(rec.prediction===1?'good':'')+'" data-lab-direction="1">ОЖИДАЮ РОСТ / ПОКУПКА</button><button class="answer-option '+(rec.prediction===-1?'good':'')+'" data-lab-direction="-1">ОЖИДАЮ ПАДЕНИЕ / ПРОДАЖА</button></div>';
   }
@@ -276,13 +302,16 @@ function renderGuidedLab(i){
  const resume=box.querySelector('#labResume');if(resume)resume.onclick=()=>{state.labs=resumeLab(state.labs,lab.id);save();showLesson(i);};
  const go=box.querySelector('#labGoTerminal');
  if(go)go.onclick=()=>setView('terminal');
+ const numericInput=box.querySelector('#labNumber');if(numericInput)numericInput.oninput=()=>{numericInput.removeAttribute('aria-invalid');const err=box.querySelector('#labInlineError');if(err){err.hidden=true;err.textContent='';}};
  const submit=box.querySelector('#labSubmit');
  if(submit)submit.onclick=()=>{
   try{
    const response=submitLabNumber(state.labs,lab.id,locked,box.querySelector('#labNumber').value);
    state.labs=response.state;save();showLesson(i);
    notify(response.correct?'Расчёт верный. Лабораторная работа завершена.':'Проверь формулу и попробуй ещё раз.');
-  }catch(e){notify(e.message);}
+  }catch(e){const input=box.querySelector('#labNumber'),label=box.querySelector('#labInlineError');
+   if(input){input.setAttribute('aria-invalid','true');input.focus();}if(label){label.textContent=e.message;label.hidden=false;}
+  }
  };
  for(const direction of box.querySelectorAll('[data-lab-direction]'))direction.onclick=()=>{
   try{state.labs=setLabPrediction(state.labs,lab.id,+direction.dataset.labDirection);save();showLesson(i);}
@@ -462,7 +491,39 @@ function inspectChartKeyboard(event){
 function chartHover(e){const c=$('priceChart'),r=c.getBoundingClientRect(),w=r.width,plot=w-8-(w>500?65:55),data=chartPositions;if(!data.length)return;const x=e.clientX-r.left,idx=Math.round((x-8)/(plot/data.length)-.5);hoverCandle=Math.max(0,Math.min(idx,data.length-1));const entry=data[hoverCandle].c,tooltip=$('chartTooltip');tooltip.hidden=false;tooltip.textContent=`${formatSimTime(entry.t)} UTC · О ${num(entry.o)}  М ${num(entry.h)}  Н ${num(entry.l)}  З ${num(entry.c)}`;tooltip.style.left=Math.min(Math.max(4,x+10),Math.max(4,w-220))+'px';tooltip.style.top=Math.max(5,(e.clientY-r.top)-37)+'px';renderChart()}
 
 function exportCSV(){const rows=['Время;Тип;Событие;Описание;Сумма',...state.logs.map(x=>[x.time,x.kind,x.title,x.desc,x.amount??''].map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';'))];const url=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='market-lab-history.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-function showReset(){modalOpen=true;$('modal').hidden=false;$('modalTitle').textContent='Новая учебная сессия';$('modalDescription').textContent='Начать заново? Баланс, позиции, результаты заданий и история текущей версии будут сброшены.';}
+
+function showReset(){
+ modalOpen=true;$('modal').hidden=false;
+ $('modalTitle').textContent='Управление торговлей и обучением';
+ const chosen=$('resetChoices').querySelector('input[value="trade"]');chosen.checked=true;
+ updateResetExplanation();chosen.focus();
+}
+function updateResetExplanation(){
+ const mode=$('resetChoices').querySelector('input[name="resetMode"]:checked')?.value||'trade';
+ $('modalDescription').textContent=resetSummary(mode);
+ $('modalDescription').classList.toggle('danger-reset',mode==='all');
+ $('modalConfirm').textContent=mode==='trade'?'НОВАЯ ТОРГОВАЯ СЕССИЯ':mode==='learning'?'СБРОСИТЬ ОБУЧЕНИЕ':'СБРОСИТЬ ВСЁ';
+ $('modalConfirm').classList.toggle('destructive',mode==='all');
+}
+function performReset(mode){
+ if(!RESET_MODES.includes(mode))throw new RangeError('Неизвестный вид сброса');
+ if(timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ';$('autoPlay').classList.remove('playing');}
+ const previous=state;
+ if(mode==='trade'){
+  const retained=tradingResetRetention(previous);
+  init();Object.assign(state,retained);
+  state.logs[0].desc+=' Учебный прогресс сохранён.';
+ }else if(mode==='learning'){
+  Object.assign(state,freshLearning());
+  state.onboardingDismissed=false;
+ }else{
+  init();selectedReviewIndex=0;
+ }
+ clearTradeError();save();render();
+ showLesson(state.lastLesson||0);
+ setBlotter('positions');closeModal();
+ notify(mode==='trade'?'Новая торговая сессия. Учебный прогресс сохранён.':mode==='learning'?'Обучение сброшено. Торговый счёт и сделки сохранены.':'Торговая сессия и обучение сброшены.');
+}
 function closeModal(){modalOpen=false;$('modal').hidden=true;}
 function bind(){
  document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));$('brandLink').onclick=e=>{e.preventDefault();setView('terminal')};$('headerLearn').onclick=()=>{setView('laboratory');showLesson(0);};
@@ -478,7 +539,8 @@ function bind(){
  const learn=(i)=>{setView('laboratory');showLesson(i)};$('helpChart').onclick=()=>learn(0);document.querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>learn(+b.dataset.lesson));$('scenarioLesson').onclick=()=>learn(4);
  $('macroRail').onclick=()=>{setView('terminal');$('scenariosPanel').scrollIntoView({behavior:'smooth',block:'nearest'});};$('blotterTabs').querySelectorAll('[data-pane]').forEach(b=>b.onclick=()=>setBlotter(b.dataset.pane));
  $('fullJournalFilters').querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{filterFull=b.dataset.kind;$('fullJournalFilters').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));renderLogs()});
- $('newSession').onclick=showReset;$('modalClose').onclick=closeModal;$('modalCancel').onclick=closeModal;$('modalConfirm').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('autoPlay').textContent='▶ ЗАПУСТИТЬ'}init();selectedReviewIndex=0;render();showLesson(0);setBlotter('positions');closeModal();notify('Учебный счёт сброшен.');};$('modal').onclick=e=>{if(e.target===$('modal'))closeModal()};
+ $('newSession').onclick=showReset;$('modalClose').onclick=closeModal;$('modalCancel').onclick=closeModal;$('modalConfirm').onclick=()=>performReset($('resetChoices').querySelector('input[name="resetMode"]:checked')?.value||'trade');
+ $('resetChoices').addEventListener('change',updateResetExplanation);$('modal').onclick=e=>{if(e.target===$('modal'))closeModal()};
  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(modalOpen)closeModal();togglePicker(false)}});$('exportJournal').onclick=exportCSV;window.addEventListener('resize',()=>requestAnimationFrame(renderChart));
 }
 if(!load())init();checkMargin();save();bind();showLesson(state.lastLesson||0);render();if(['#terminal','#laboratory','#journal'].includes(location.hash))setView(location.hash.slice(1));
