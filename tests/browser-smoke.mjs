@@ -106,5 +106,77 @@ try{
   assert.equal(errors.length,0,errors.join('; '));
   await ctx.close();
  });
+
+ await scenario('Trade reset retains learning, while learning-only and full reset are separate',async()=>{
+  const context=await browser.newContext({viewport:{width:1440,height:900}});
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const state=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('marketlab-education-workstation-v8')));
+  await page.goto(url,{waitUntil:'networkidle'});
+  await page.locator('[data-view="laboratory"]').click();
+  await page.locator('#labStart').click();
+  await page.locator('#labNumber').fill('0,5');
+  await page.locator('#labSubmit').click();
+  await page.locator('[data-view="terminal"]').click();
+  await page.locator('#placeOrder').click();
+  await page.locator('#tickOne').click();
+  await page.locator('#closeSelected').click();
+  let data=await state();
+  assert.equal(data.trades.length,1);
+  assert.equal(data.labs.records.contract.everCompleted,true);
+  await page.locator('[data-view="journal"]').click();
+  await page.locator('#newSession').click();
+  assert.equal(await page.locator('input[name="resetMode"]:checked').getAttribute('value'),'trade');
+  assert.match(await page.locator('#modalDescription').innerText(),/сохранятся/);
+  await page.locator('#modalConfirm').click();
+  data=await state();
+  assert.equal(data.trades.length,0);
+  assert.equal(data.positions.length,0);
+  assert.equal(data.cash,50000);
+  assert.equal(data.labs.records.contract.everCompleted,true);
+  assert.ok(data.lessonViews.includes(0));
+  // Start a new position, then reset learning only.
+  await page.locator('[data-view="terminal"]').click();
+  await page.locator('#placeOrder').click();
+  data=await state();const positionId=data.positions[0].id;
+  await page.locator('[data-view="journal"]').click();
+  await page.locator('#newSession').click();
+  await page.locator('input[name="resetMode"][value="learning"]').check();
+  assert.match(await page.locator('#modalDescription').innerText(),/останутся прежними/);
+  await page.locator('#modalConfirm').click();
+  data=await state();
+  assert.equal(data.positions[0].id,positionId);
+  assert.equal(data.labs.records.contract.everCompleted,false);
+  assert.equal(data.lessonViews.length,0);
+  // Complete reset removes both without leaving old localStorage state in the v8 slot.
+  await page.locator('#newSession').click();
+  await page.locator('input[name="resetMode"][value="all"]').check();
+  assert.match(await page.locator('#modalDescription').innerText(),/нельзя отменить/);
+  await page.locator('#modalConfirm').click();
+  data=await state();
+  assert.equal(data.positions.length,0);
+  assert.equal(data.trades.length,0);
+  assert.equal(data.lessonViews.length,0);
+  assert.equal(data.cash,50000);
+  assert.equal(errors.length,0,errors.join('; '));
+  await context.close();
+ });
+ await scenario('Numeric errors stay inline and clear when user edits',async()=>{
+  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(url,{waitUntil:'networkidle'});
+  await page.locator('[data-view="laboratory"]').click();
+  await page.locator('#labStart').click();
+  await page.locator('#labNumber').fill('abc');
+  await page.locator('#labSubmit').click();
+  assert.equal(await page.locator('#labNumber').getAttribute('aria-invalid'),'true');
+  assert.equal(await page.locator('#labInlineError').isVisible(),true);
+  assert.match(await page.locator('#labInlineError').innerText(),/Введите число/);
+  await page.locator('#labNumber').fill('0,5');
+  assert.equal(await page.locator('#labInlineError').isVisible(),false);
+  await page.locator('#labSubmit').click();
+  assert.match(await page.locator('#lessonBody').innerText(),/ВЫПОЛНЕНО/);
+  assert.equal(errors.length,0,errors.join('; '));
+  await context.close();
+ });
 }finally{await browser?.close();await new Promise(ok=>server.close(ok));}
 if(failures.length){console.error(failures.join('\n\n'));process.exitCode=1;}
